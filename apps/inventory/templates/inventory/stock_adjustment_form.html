@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Adjust stock{% endblock %}
+{% block content %}
+<h1 class="h4 mb-3">Adjust stock</h1>
+<form method="post" class="col-md-6">
+    {% csrf_token %}
+    {{ form.non_field_errors }}
+    {{ form.as_p }}
+    <button type="submit" class="btn btn-primary">Record adjustment</button>
+</form>
+{% endblock %}

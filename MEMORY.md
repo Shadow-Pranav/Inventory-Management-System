@@ -130,6 +130,44 @@ legacy `UserProfile.role` rows into `Membership` against a fallback org — moot
 (greenfield, no legacy rows). No `DEFAULT_ORG` concept exists in this codebase.
 **`Membership.stores` (M2M to `inventory.Location`) is deferred to Phase 2** — the app
 doesn't exist yet to reference. Noted inline in `apps/tenancy/models.py` and in context 01.
+**Resolved in Phase 2** (D-14) once `apps.inventory` existed — X-06 closed.
+
+### D-14 · Phase 2 implementation decisions
+**Date:** Session 1 (2026-08-09) · **Status:** Active
+**`apply_movement()` uses `.for_organization(org)`, not `all_objects` or the ambient
+contextvar.** Context 04 §2's reference implementation reads `StockLevel.objects...` bare,
+implicitly relying on the contextvar already being set. `apply_movement()` is a *service*
+function per context 04 §1 ("services take primitives... never `request`") and receives
+`organization` explicitly — mutating the ambient thread-local as a side effect of a stateless
+service call would be surprising, and actively wrong for Phase 6's cross-org transfer (one
+call touching two organisations' stock in one transaction — the contextvar can only ever
+hold one org at a time). `.for_organization()` (added in G-07) is stateless and exactly
+matches "explicit organization in, scoped queryset out."
+**`StockLevel`'s partial unique constraint.** Postgres treats `NULL` as distinct in a unique
+index, so `UniqueConstraint(["organization","item","location","batch"])` alone would let
+multiple rows exist for the same `(org, item, location)` whenever `batch` is `NULL`
+(untracked items — the common case). Added a second constraint,
+`condition=Q(batch__isnull=True)`, closing that gap. Caught before it could ever produce a
+duplicate row, not a gotcha hit in production — but exactly the kind of stock-arithmetic
+correctness issue CLAUDE.md §3 rule 5 cares about, so recorded here rather than left as an
+undocumented "just how it is."
+**Moving average is item-level, weighted by total on-hand across all locations** — `Item`
+has one `unit_cost`, not one per location, and context 04 §2's `update_moving_average(item,
+quantity, unit_cost)` signature (no `location` arg) confirms that's the intended scope.
+Implemented as: aggregate current total `StockLevel.quantity` for the item *after* the
+receiving level is saved, back out `total_before = total_after - received_qty`, then the
+standard weighted-average formula. Only `RECEIPT` and `OPENING` are `COST_BEARING` — never
+`TRANSFER_IN` (the cost basis moves with the stock, it isn't re-priced) and never `ISSUE`
+(explicit in context 04 §4: "on receipt only").
+**`StockMovement.save()` raises if `self.pk` is already set** — belt-and-braces enforcement
+of "never updated, never deleted" (context 04 §2), not speculative: the ledger's integrity
+*is* the audit trail: a silent `.save()` on an existing row would be invisible corruption.
+**`IssueRequest.issue_number` has no uniqueness constraint yet** — Phase 5 owns the
+per-org-per-FY sequence generator (`select_for_update()` on a sequence row, per context 04
+§3). Adding a constraint now against an unpopulated/blank field would either block on empty
+strings colliding or need a throwaway numbering scheme Phase 5 would just replace. Left
+blank and unconstrained; do not add ad hoc numbering here when Phase 5 starts — build the
+real generator.
 
 ### D-10 · Compliance registers are per-organisation
 **Why:** A hospital's biomedical-waste obligations and a hotel-management college's FSSAI
@@ -317,6 +355,43 @@ mentioning `/run/desktop/mnt/host/...` or "No such device", don't debug it as an
 restart Docker Desktop first and retry. Seen after the machine had been idle; may correlate
 with sleep/resume or long idle periods on this Windows host.
 
+### G-09 · Every `TenantModelForm` subclass with a FK field crashed on import
+**Phase:** 2 · **Date:** 2026-08-09
+**Symptom:** `python manage.py check` (and just importing any view module) crashed with
+`UnscopedQueryError: Category.objects accessed with no active organization` — not from a
+view running, from the `class CategoryForm(TenantModelForm):` statement itself, at module
+import time. Every `TenantModelForm` subclass with any FK/M2M field hit this — not a
+one-off, a systemic break of the whole `TenantModelForm` mechanism built in Phase 1.
+**Cause:** Three-layer problem, each layer looking like a fix for the previous one until it
+wasn't:
+1. Django's `ModelFormMetaclass` builds a `ModelChoiceField` for every FK by calling
+   `field.formfield()` **at class-definition time** — before any request, before any
+   contextvar is set.
+2. `ForeignKey.formfield()`'s own `defaults` dict has a literal entry
+   `"queryset": self.remote_field.model._default_manager.using(using)` — evaluated
+   unconditionally while the dict is built. `_default_manager` is `objects`, the strict
+   `TenantManager` (deliberately, per G-07's reasoning — it must stay the default manager
+   for other Django internals). With no contextvar set, this raises immediately.
+3. Passing `queryset=...` in `formfield_callback`'s kwargs does **not** prevent step 2 —
+   Django evaluates its own default queryset expression before ever looking at the kwargs
+   dict to override it. The crash happens constructing Django's `defaults`, not after.
+   `Model.validate_constraints()` (run by `full_clean()`, i.e. every `form.is_valid()`) has
+   the same `_default_manager` dependency for `UniqueConstraint` checks — that part isn't a
+   bug, it's the same contextvar contract `test_isolation.py` already follows; a real
+   request has it set by `OrganizationMiddleware` before the view runs.
+**Fix:** `apps/core/forms.py` — `TenantModelFormMetaclass` injects a `formfield_callback`
+that never calls `field.formfield()` for FK/M2M-to-`TenantOwnedModel` fields at all;
+it constructs `forms.ModelChoiceField`/`ModelMultipleChoiceField` directly with
+`remote_model.all_objects.none()`. `.none()`, not `.all()` — fails closed: a field left out
+of `tenant_fields` renders as an empty, obviously-broken dropdown in dev, not a cross-org
+leak. `context/02-tenancy.md` §3 updated with the corrected `TenantModelForm`.
+**Watch for:** any plain (non-`TenantModelForm`) form with a class-body
+`SomeTenantModel.objects.none()` for a queryset default has the exact same problem —
+`apps/inventory/forms.py::StockAdjustmentForm` hit this too; use `.all_objects.none()` in
+form class bodies, always. If a *new* Django/DRF integration ever needs
+`Model._default_manager` for something else at import/class time, expect the same crash and
+apply the same "don't touch the strict manager before a request exists" fix.
+
 Template:
 
 ```
@@ -341,8 +416,10 @@ Things deliberately not decided yet, so nobody assumes they were overlooked.
 | X-03 | Fiscal-year rollover / opening-balance carry-forward mechanics | Needs Q3 answered | Phase 5 |
 | X-04 | Whether the hospital pharmacy is in scope or a separate HMIS owns it | Needs Q4 answered | Phase 5 |
 | X-05 | Data retention for `StockMovement` and `AuditLog` | No regulatory input yet | Phase 12 |
-| X-06 | `Membership.stores` M2M to `inventory.Location` | `apps.inventory` doesn't exist until Phase 2 | Phase 2, alongside `Location` |
 | X-07 | Is Riddhima's `org_type` really `VENTURE`? Guessed, not confirmed (see D-13) | Not load-bearing yet | Before Phase 7 (compliance templates key off `org_type`) |
+| X-08 | `IssueRequest.issue_number` — per-org-per-FY sequence generator | Belongs with the rest of the doc-numbering convention (context 04 §3), not built ahead of it | Phase 5 |
+
+**Resolved:** X-06 (`Membership.stores` M2M) — done in Phase 2, see D-14.
 
 ---
 

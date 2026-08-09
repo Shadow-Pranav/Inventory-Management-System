@@ -9,12 +9,12 @@
 
 | | |
 |---|---|
-| **Last session** | Session 1 (2026-08-09) — Phase 0 and Phase 1 both closed (gates passed, cold-start verified by the user each time); Phase 2 opened, no code written yet |
+| **Last session** | Session 1 (2026-08-09) — Phase 2 all 6 tasks built and passing: catalog/inventory/issuance models, `apply_movement()`, `Membership.stores`, views/forms/templates |
 | **Current phase** | Phase 2 — Catalogue & inventory models |
-| **Phase status** | `IN PROGRESS` — not yet started coding |
-| **Next action** | Start Phase 2 task 1: `apps/catalog/` models (`Category`, `Item`, `UnitOfMeasure`, `Supplier`, `ItemSupplier`), org-scoped `UniqueConstraint`s from the first migration. |
+| **Phase status** | `IN PROGRESS` — all tasks complete, acceptance criteria met; **not yet gated** (no `/next-phase` cold-start run this slice) |
+| **Next action** | Run `/next-phase` to gate Phase 2 closed (needs a user-run cold-start check — G-05) and open Phase 3. |
 | **Blockers** | None. Q4–Q8 still open, needed before Phase 5. |
-| **Branch** | `main` — 6 commits (`824a109` … `74062af`); tree clean, nothing uncommitted |
+| **Branch** | `main` — 7 commits so far (`824a109` … `ee6d01f`); Phase 2 work not yet committed |
 
 ---
 
@@ -24,7 +24,7 @@
 |---|---|---|---|---|---|
 | 0 | Bootstrap the project | `DONE` | 2026-08-09 | 2026-08-09 | Greenfield (D-11); cold-start verified |
 | 1 | Tenancy foundation | `DONE` | 2026-08-09 | 2026-08-09 | Gate passed cold-start, 19/19 tests, DoD walked |
-| 2 | Catalogue & inventory models | `IN PROGRESS` | 2026-08-09 | — | Tenancy-scoped from the first migration (greenfield, D-11) |
+| 2 | Catalogue & inventory models | `IN PROGRESS` | 2026-08-09 | — | All 6 tasks built & tested; awaiting `/next-phase` gate |
 | 3 | Access control & org admin | `NOT STARTED` | — | — | Drop `Item.quantity` at the end |
 | 4 | Master data & catalogue | `NOT STARTED` | — | — | |
 | 5 | Procurement (Req→PO→GRN) | `NOT STARTED` | — | — | |
@@ -109,28 +109,39 @@
 
 ## Phase 2 — task checklist (IN PROGRESS, started 2026-08-09)
 
-> Greenfield (D-11): building `catalog`/`inventory` directly, tenancy-scoped from the first
-> migration — no `RenameModel` off a legacy `ims_app`. No `quantity` field on `Item`, ever
-> (D-05) — `StockLevel` is the balance from day one.
+All 6 tasks complete; phase gate (`/next-phase`) not yet run this slice.
 
-- [ ] `apps/catalog/`: `Category`, `Item` (no `quantity`), `UnitOfMeasure`, `Supplier`,
+- [x] `apps/catalog/`: `Category`, `Item` (no `quantity`), `UnitOfMeasure`, `Supplier`
+      (+ `blacklist_reason`, not in the original spec but paired with `is_blacklisted`),
       `ItemSupplier` — org-scoped `UniqueConstraint`s on `Item.name`, `Item.sku`,
       `Category.name` from the first migration (F-01's lesson, applied proactively)
-- [ ] `apps/inventory/`: `Location` (real hierarchy per D-12/Q2 — multiple stores per org,
-      not a single `MAIN_STORE` default), `StockLevel`, `StockMovement` (the ledger,
-      `balance_after` per F-03), `Batch`, `SerialUnit`
-- [ ] `apps/inventory/services.py::apply_movement()` per context 04 §2 — the only writer of
-      `StockLevel.quantity`, `transaction.atomic()` + `select_for_update()`
-- [ ] `apps/issuance/`: `IssueRequest`, `IssueItem` (built directly — no `Order` to rename)
-- [ ] Views/forms/templates: category tree, item CRUD + detail, stock level view, manual
-      stock adjustment (routed through `apply_movement()`), issue-request raise/list —
-      `TenantModelForm` with `tenant_fields`, templates at `apps/<app>/templates/<app>/`
-- [ ] Extend the isolation suite: add `<Model>Factory` for every new `TenantOwnedModel` in
-      each app's `tests/factories.py` (the suite auto-discovers from there — see G-06)
-- [ ] Extend `Membership` with the deferred `stores` M2M to `inventory.Location` (X-06)
+- [x] `apps/inventory/`: `Location` (real hierarchy per D-12/Q2 — multiple stores per org,
+      not a single `MAIN_STORE` default), `StockLevel` (with a *second*, partial unique
+      constraint — Postgres doesn't dedupe `NULL` batches, see D-14), `StockMovement` (the
+      ledger, `balance_after` per F-03, `save()` raises on update — "append-only" enforced,
+      not just documented), `Batch`, `SerialUnit` (`asset` O2O deferred to Phase 7)
+- [x] `apps/inventory/services.py::apply_movement()` per context 04 §2 — the only writer of
+      `StockLevel.quantity`, `transaction.atomic()` + `select_for_update()`, uses
+      `.for_organization()` not the ambient contextvar (D-14). Moving-average cost update
+      is item-level, `RECEIPT`/`OPENING` only. 6 service tests including the **10-parallel-
+      issues-from-5 concurrency test from this phase's acceptance criteria — passes**
+- [x] `apps/issuance/`: `IssueRequest`, `IssueItem` (built directly — no `Order` to rename).
+      `issue_number` deliberately left unconstrained — Phase 5 owns doc numbering (X-08)
+- [x] Views/forms/templates: category tree (flat list — Phase 4 does the real tree UI), item
+      CRUD + detail, stock level view, manual stock adjustment (routed through
+      `apply_movement()`), issue-request raise/list — `TenantModelForm` with `tenant_fields`,
+      templates at `apps/<app>/templates/<app>/`. **Found and fixed a major bug in the
+      process**: every `TenantModelForm` subclass with a FK field crashed at import time
+      (G-09) — Django's `ModelFormMetaclass` calls the strict manager before any request
+      exists. Fixed with a custom metaclass; `context/02-tenancy.md` corrected to match.
+      13 new form/view tests, including real end-to-end Client-based login→view cycles
+- [x] `Membership.stores` M2M to `inventory.Location` filled in now that the app exists
+      (X-06 closed, D-14)
+- [x] Isolation suite auto-extended: 5 catalog + 5 inventory + 2 issuance models × 4 checks
+      = 55 isolation assertions, all via `<Model>Factory` per app (G-06's convention)
 
-Phases 3–12 checklists get expanded when each phase starts. Do not pre-expand them —
-they go stale and cost tokens to read.
+Phase 3 checklist gets expanded when it starts, after `/next-phase` gates Phase 2 closed. Do
+not pre-expand — checklists go stale and cost tokens to read.
 
 ---
 
@@ -151,11 +162,26 @@ apps/core/migrations/__init__.py
 apps/core/tests/{__init__,test_healthz}.py
 
 apps/tenancy/{__init__,apps,models,admin,middleware,decorators,views,urls,context_processors}.py
-apps/tenancy/migrations/{__init__,0001_initial,0002_seed_organizations}.py
+apps/tenancy/migrations/{__init__,0001_initial,0002_seed_organizations,0003_membership_stores}.py
 apps/tenancy/fixtures/organizations.json
 apps/tenancy/management/commands/{seed_demo,create_trust_admin}.py
 apps/tenancy/tests/{__init__,factories,test_isolation,test_decorators}.py
 apps/tenancy/templates/tenancy/{no_access,switch_organization}.html
+
+apps/catalog/{__init__,apps,models,admin,forms,views,urls}.py
+apps/catalog/migrations/{__init__,0001_initial}.py
+apps/catalog/tests/{__init__,factories,test_forms,test_views}.py
+apps/catalog/templates/catalog/{category_list,category_form,item_list,item_detail,item_form}.html
+
+apps/inventory/{__init__,apps,models,admin,forms,views,urls,services,exceptions}.py
+apps/inventory/migrations/{__init__,0001_initial}.py
+apps/inventory/tests/{__init__,factories,test_services,test_views}.py
+apps/inventory/templates/inventory/{stock_level_list,stock_adjustment_form}.html
+
+apps/issuance/{__init__,apps,models,admin,forms,views,urls}.py
+apps/issuance/migrations/{__init__,0001_initial}.py
+apps/issuance/tests/{__init__,factories,test_views}.py
+apps/issuance/templates/issuance/{issue_request_list,issue_request_form}.html
 ```
 
 Update this tree as apps are created. It is how the next session knows the layout without
@@ -168,16 +194,16 @@ scanning the repo.
 | Suite | Tests | Passing | Coverage |
 |---|---|---|---|
 | core (`/healthz/`) | 1 | 1 | — |
-| tenancy isolation (`test_isolation.py`) | 7 | 7 | `Department`; other tenant models don't exist yet |
+| tenancy isolation (`test_isolation.py`) | 7 | 7 | `Department` |
 | tenancy access control (`test_decorators.py`) | 11 | 11 | `require_org_context`, `require_role`, `require_trust_admin`, `get_tenant_object` |
-| catalog | 0 | — | — |
-| inventory | 0 | — | — |
-| procurement | 0 | — | — |
-| issuance | 0 | — | — |
-| assets | 0 | — | — |
-| intelligence | 0 | — | — |
-| alerts | 0 | — | — |
-| **Total** | **19** | **19** | — |
+| catalog | 28 | 28 | Isolation ×5 models (20), `TenantModelForm` regression (G-09) ×3, views ×5 |
+| inventory | 29 | 29 | Isolation ×5 models (20), `apply_movement()` ×6 (incl. concurrency), views ×3 |
+| procurement | 0 | — | Phase 5 |
+| issuance | 10 | 10 | Isolation ×2 models, views ×2 |
+| assets | 0 | — | Phase 7 |
+| intelligence | 0 | — | Phase 8 |
+| alerts | 0 | — | Phase 9 |
+| **Total** | **86** | **86** | — |
 
 No baseline to carry over — greenfield build, see D-11 in `MEMORY.md`.
 
@@ -258,8 +284,20 @@ Newest first. Keep entries to three lines. Detail belongs in `MEMORY.md`.
 - `/checkpoint`: `web` container crashed on a Docker Desktop Windows file-sharing glitch
   (`OSError: No such device`, then a stuck mount path) — unrelated to app code. Restarting
   Docker Desktop fixed it; `db`/`redis` data untouched throughout. Recorded as G-08.
-- No Phase 2 code written yet this session — checkpoint/session-end landed mid-transition.
-- Next: `apps/catalog/` models.
+- `/session-start` (same day, continued): fixed a stale context 04 reference to
+  `templates/ims_app/base.html` (doesn't exist — greenfield, D-11), then built all 6 Phase 2
+  tasks: `apps/catalog` (5 models), `apps/inventory` (5 models + `apply_movement()`),
+  `apps/issuance` (2 models), `Membership.stores`, and views/forms/templates for all three
+  apps.
+- Found and fixed a major bug: every `TenantModelForm` subclass with a FK field crashed at
+  *import time* — Django's `ModelFormMetaclass` calls the strict `TenantManager` before any
+  request or contextvar exists. Fixed via a custom metaclass in `apps/core/forms.py`
+  (G-09); `context/02-tenancy.md` corrected, since the bug traced back to its code sample.
+- Concurrency test from Phase 2's own acceptance criteria (10 parallel issues from a stock
+  of 5 → exactly 5 succeed) passes. 86/86 tests green, ruff clean, no pending migrations.
+  Smoke-tested all 4 new list views end-to-end via curl login.
+- Next: run `/next-phase` to gate Phase 2 closed (user-run cold-start, G-05), then open
+  Phase 3 (access control & org admin).
 
 ### 2026-XX-XX — Session 0 (setup)
 - Audited the original repo; produced `ANALYSIS.md`

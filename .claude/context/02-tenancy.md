@@ -177,6 +177,22 @@ class ItemForm(TenantModelForm):        # base class takes `request` in __init__
 `TenantModelForm.__init__` loops `tenant_fields` and rewrites each
 `self.fields[f].queryset = field_model.objects.for_request(self.request)`.
 
+> **Corrected in Phase 2** (see G-09 in `MEMORY.md`): that `__init__` loop alone isn't
+> enough. Django's `ModelFormMetaclass` builds a `ModelChoiceField` for every FK **at class
+> definition time**, and `ForeignKey.formfield()`'s own defaults call
+> `remote_model._default_manager` unconditionally while building its kwargs dict —
+> `objects`, the strict `TenantManager`, with no request and no contextvar yet. Every
+> `TenantModelForm` subclass with a FK field crashed on import until `apps/core/forms.py`
+> gained a `TenantModelFormMetaclass` that injects a `formfield_callback`: for any FK/M2M
+> whose remote model has `all_objects`, it builds the form field directly with
+> `remote_model.all_objects.none()`, never calling `field.formfield()` (which is what
+> triggers the crash). `.none()`, not `.all()` — a field left out of `tenant_fields` fails
+> closed (empty dropdown), not open (every org's rows).
+>
+> The same rule applies to any **plain** `forms.Form` with a class-body queryset default —
+> `SomeModel.objects.none()` in a field declaration crashes the same way; use
+> `SomeModel.all_objects.none()` there too.
+
 Without this, a crafted POST sets `category_id` to another org's category and the FK
 validates cleanly. A `clean()`-level check alone is not enough — the dropdown must also
 never render foreign options.

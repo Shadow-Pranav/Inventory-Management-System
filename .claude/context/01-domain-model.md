@@ -63,9 +63,8 @@ class Membership                               # user × organisation, carries t
     user, organization
     role ∈ {ORG_ADMIN, STORE_MANAGER, DEPT_STAFF, AUDITOR}
     department = FK(Department, null=True)     # required when role == DEPT_STAFF
-    # stores = M2M("inventory.Location", blank=True)   # STORE_MANAGER scope narrowing
-    # ^ deferred until apps.inventory exists (Phase 2) — inventory.Location can't be
-    #   referenced before the app is installed. Add the field + a migration in Phase 2.
+    stores = M2M("inventory.Location", blank=True)   # STORE_MANAGER scope narrowing
+    # ^ filled in Phase 2 once apps.inventory existed (was deferred in Phase 1, see D-14).
     is_active
     Meta: UniqueConstraint(["user", "organization"])
 ```
@@ -76,6 +75,11 @@ while holding read-only audit access in IMS. A single global role cannot express
 ---
 
 ## apps/catalog
+
+**Built Phase 2**, matching this section as written, plus one addition:
+`Supplier.blacklist_reason` (TextField, blank) alongside `is_blacklisted` — the reason a
+blacklisted supplier was blacklisted needs to live *somewhere*, and it belongs next to the
+flag rather than waiting for Phase 4's full blacklist UI.
 
 ```python
 class UnitOfMeasure *          # piece, box, litre, kg, pack-of-100
@@ -117,6 +121,14 @@ class ItemSupplier *           # price list / preferred vendor
 
 ## apps/inventory
 
+**Built Phase 2**, matching this section, plus two hardening additions recorded in D-14:
+`StockLevel` carries a second, partial `UniqueConstraint` (`condition=batch__isnull=True`)
+alongside the one below — Postgres doesn't enforce uniqueness across `NULL`s, so the plain
+constraint alone would let untracked items get duplicate rows. `StockMovement.save()` raises
+if `self.pk` is already set, enforcing "never updated" at the model layer, not just by
+convention. `SerialUnit.asset` (O2O to `assets.Asset`) is commented out below — deferred
+until `apps.assets` exists in Phase 7, same pattern as `Membership.stores` was in Phase 1.
+
 ```python
 class Location *               # a physical store, sub-store or department store
     name, code, location_type ∈ {MAIN_STORE, SUB_STORE, DEPT_STORE, LAB, WARD, KITCHEN}
@@ -130,6 +142,7 @@ class StockLevel *             # the current-quantity table; one row per (item, 
     quantity = Decimal
     reserved_quantity = Decimal    # committed to an approved-but-unissued request
     Meta: UniqueConstraint(["organization", "item", "location", "batch"])
+          UniqueConstraint(["organization", "item", "location"], condition=Q(batch__isnull=True))
     @property available = quantity - reserved_quantity
     # Only ever mutated inside apply_movement() with select_for_update().
 
@@ -140,7 +153,7 @@ class Batch *
 class SerialUnit *             # one physical asset instance
     item, serial_number, batch (null), current_location, current_holder = FK(User, null)
     status ∈ {IN_STOCK, ISSUED, IN_REPAIR, RETIRED, LOST}
-    asset = O2O("assets.Asset", null=True)
+    # asset = O2O("assets.Asset", null=True)   — deferred, apps.assets doesn't exist until Phase 7
     Meta: UniqueConstraint(["organization", "serial_number"])
 
 class StockMovement *          # THE LEDGER. Append-only. Was `InventoryLog`.
@@ -184,6 +197,10 @@ Posting a GRN is the **only** way stock enters via procurement, and it emits one
 ---
 
 ## apps/issuance
+
+**Models built Phase 2** (shape only — approve/issue/reserve flow is Phase 6). `issue_number`
+has no uniqueness constraint yet; that's Phase 5's per-org-per-FY sequence generator to add
+(X-08), not something to half-build ahead of it.
 
 ```
 IssueRequest *         was `Order`. issue_number, department, requested_by, purpose,

@@ -7,6 +7,9 @@ urlpatterns = [
     path("accounts/", include("django.contrib.auth.urls")),
     path("", include("apps.tenancy.urls")),
     path("", include("apps.core.urls")),
+    path("catalog/", include("apps.catalog.urls")),
+    path("inventory/", include("apps.inventory.urls")),
+    path("issuance/", include("apps.issuance.urls")),
 ]
 
 if settings.DEBUG:

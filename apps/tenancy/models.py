@@ -95,8 +95,9 @@ class Membership(TimeStampedModel):
     department = models.ForeignKey(
         Department, null=True, blank=True, on_delete=models.SET_NULL, related_name="memberships"
     )
-    # `stores` (M2M to inventory.Location, for STORE_MANAGER scope narrowing) is deferred
-    # until apps.inventory exists in Phase 2 — see MEMORY.md Section D.
+    stores = models.ManyToManyField(
+        "inventory.Location", blank=True, related_name="store_managers"
+    )  # STORE_MANAGER scope narrowing (X-06, filled in now that apps.inventory exists)
     is_active = models.BooleanField(default=True)
 
     class Meta:

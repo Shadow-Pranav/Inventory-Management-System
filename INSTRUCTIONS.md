@@ -161,20 +161,20 @@ Files:    PROGRESS.md, MEMORY.md, <context files> updated ✓
 ```
 Last updated:     Session 1 (2026-08-09)
 Phase:            2 — Catalogue & inventory models
-Status:           IN PROGRESS (not yet started coding; Phase 0 and Phase 1 both DONE)
-Apps existing:    apps.core (scoping machinery, forms, factories, /healthz/),
-                  apps.tenancy (Organization, Department, User, Membership, middleware,
-                  decorators, org switcher, seed_demo/create_trust_admin)
-Models existing:  tenancy.Organization, tenancy.Department (TenantOwnedModel),
-                  tenancy.User (AUTH_USER_MODEL, USERNAME_FIELD=email), tenancy.Membership
-Migrations:       tenancy 0001_initial, 0002_seed_organizations (7 SRMS orgs from fixture)
-                  + django built-ins + django_celery_beat
-Tests:            19 passing — core/tests/test_healthz.py (1),
-                  tenancy/tests/test_isolation.py (7), tenancy/tests/test_decorators.py (11)
-Docker:           up and healthy, cold-start verified twice this session (Phase 0 and
-                  Phase 1 gates — user-run each time, see G-05)
+Status:           IN PROGRESS — all 6 tasks built & tested, not yet gated via /next-phase
+Apps existing:    apps.core, apps.tenancy (Phase 1), apps.catalog (Category, Item,
+                  UnitOfMeasure, Supplier, ItemSupplier), apps.inventory (Location,
+                  StockLevel, StockMovement, Batch, SerialUnit, apply_movement()),
+                  apps.issuance (IssueRequest, IssueItem)
+Models existing:  12 tenant-owned models total. Item has no quantity field (D-05);
+                  StockLevel has a partial unique constraint for NULL batches (D-14);
+                  StockMovement.save() enforces append-only
+Migrations:       tenancy (3), catalog (1), inventory (1), issuance (1) + django built-ins
+Tests:            86 passing — see PROGRESS.md Test status table for the breakdown
+Docker:           up and healthy. Cold-start verified for Phase 0 and Phase 1 (user-run
+                  each time — G-05); not yet re-verified for Phase 2's new migrations.
 Celery:           wired (config/celery.py), not yet exercised
-Next action:      apps/catalog/ models — Category, Item (no quantity field, ever — D-05),
-                  UnitOfMeasure, Supplier, ItemSupplier
-Open blockers:    none for Phase 2. Q4-Q8 still open, needed before Phase 5.
+Next action:      run /next-phase to gate Phase 2 closed (user-run cold-start) and open
+                  Phase 3 (access control & org admin)
+Open blockers:    none for Phase 3. Q4-Q8 still open, needed before Phase 5.
 ```

@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Stock levels{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="h4 mb-0">Stock levels</h1>
+    <a class="btn btn-primary btn-sm" href="{% url 'inventory:stock_adjustment_create' %}">Adjust stock</a>
+</div>
+<table class="table table-sm">
+    <thead><tr><th>Item</th><th>Location</th><th>Batch</th><th>Quantity</th><th>Reserved</th><th>Available</th></tr></thead>
+    <tbody>
+        {% for level in levels %}
+        <tr>
+            <td>{{ level.item }}</td>
+            <td>{{ level.location }}</td>
+            <td>{{ level.batch|default:"—" }}</td>
+            <td>{{ level.quantity }}</td>
+            <td>{{ level.reserved_quantity }}</td>
+            <td>{{ level.available }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6" class="text-muted">No stock recorded yet.</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

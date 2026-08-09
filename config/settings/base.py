@@ -28,6 +28,9 @@ INSTALLED_APPS = [
     "django_extensions",
     "apps.core",
     "apps.tenancy",
+    "apps.catalog",
+    "apps.inventory",
+    "apps.issuance",
 ]
 
 AUTH_USER_MODEL = "tenancy.User"

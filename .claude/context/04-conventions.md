@@ -31,7 +31,8 @@ def issue_stock(request, item_id): ...
 
 ## 2. Stock mutation — the one true path
 
-**Every** change to on-hand quantity goes through this, with no exceptions:
+**Every** change to on-hand quantity goes through `apps/inventory/services.py::apply_movement()`,
+with no exceptions. **Built Phase 2** — the real implementation, kept in sync here:
 
 ```python
 @transaction.atomic
@@ -42,9 +43,13 @@ def apply_movement(*, organization, item, location, movement_type, quantity,
     if quantity <= 0:
         raise ValidationError("quantity must be positive; direction comes from movement_type")
 
-    level, _ = StockLevel.objects.select_for_update().get_or_create(
-        organization=organization, item=item, location=location, batch=batch,
-        defaults={"quantity": 0},
+    level, _ = (
+        StockLevel.objects.for_organization(organization)
+        .select_for_update()
+        .get_or_create(
+            organization=organization, item=item, location=location, batch=batch,
+            defaults={"quantity": Decimal(0)},
+        )
     )
     delta = SIGN[movement_type] * quantity
     new_qty = level.quantity + delta
@@ -55,15 +60,18 @@ def apply_movement(*, organization, item, location, movement_type, quantity,
     level.quantity = new_qty
     level.save(update_fields=["quantity", "updated_at"])
 
+    effective_unit_cost = unit_cost if unit_cost is not None else item.unit_cost
     if movement_type in COST_BEARING and unit_cost is not None:
-        update_moving_average(item, quantity, unit_cost)
+        item.unit_cost = _moving_average(item, quantity, unit_cost)  # item-level, not per-location
+        item.save(update_fields=["unit_cost"])
 
-    return StockMovement.objects.create(
+    return StockMovement.objects.for_organization(organization).create(
         organization=organization, item=item, location=location, batch=batch,
         serial_unit=serial_unit, movement_type=movement_type, quantity=quantity,
-        balance_after=new_qty, unit_cost=unit_cost or item.unit_cost,
-        total_value=quantity * (unit_cost or item.unit_cost),
-        source=source, reason=reason, created_by=actor,
+        balance_after=new_qty, unit_cost=effective_unit_cost,
+        total_value=quantity * effective_unit_cost,
+        source_content_type=..., source_object_id=...,  # from `source`, via ContentType
+        reason=reason, created_by=actor,
     )
 ```
 
@@ -72,7 +80,15 @@ Rules:
 - `select_for_update()` is mandatory. Without it, concurrent issues corrupt the balance.
 - Never `item.quantity -= n`. `Item` has no `quantity` field, deliberately.
 - Never `StockLevel.objects.filter(...).update(quantity=...)` — bypasses the ledger.
-- Corrections are compensating movements, never edits or deletes of existing ones.
+- Corrections are compensating movements, never edits or deletes of existing ones —
+  `StockMovement.save()` raises if called on an already-persisted row, enforcing this.
+- Uses `.for_organization(org)`, never the bare `objects` manager or the ambient
+  contextvar — `apply_movement()` is a stateless service taking `organization` explicitly
+  (context 04 §1), and Phase 6's cross-org transfer touches two organisations' stock in one
+  call, which the single-value contextvar can't represent anyway. See G-07, D-14 in
+  `MEMORY.md`.
+- `COST_BEARING = {RECEIPT, OPENING}` only — never `TRANSFER_IN` (cost basis moves with the
+  stock) or `ISSUE` (moving average updates on receipt only, §4 below).
 
 ---
 
