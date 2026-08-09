@@ -148,8 +148,9 @@ apps/<app>/tests/
 
 ## 7. Templates & frontend
 
-- Keep the existing `templates/ims_app/base.html` layout, navbar and Bootstrap 5 look. New
-  templates extend it.
+- `templates/base.html` (Phase 1, greenfield — see D-11 in `MEMORY.md`) is the project-wide
+  layout: Bootstrap 5 + HTMX via CDN, `{% include "partials/navbar.html" %}` for the navbar
+  (org switcher dropdown, login state). New templates extend `base.html`; don't fork it.
 - Move templates into `apps/<app>/templates/<app>/` as each app is carved out.
 - HTMX for partial updates. Return a fragment template, not JSON, for HTMX requests:
   `if request.headers.get("HX-Request"):`
