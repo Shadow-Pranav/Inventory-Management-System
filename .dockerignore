@@ -1,0 +1,17 @@
+.git
+.gitattributes
+.claude
+__pycache__
+*.pyc
+*.pyo
+*.sqlite3
+media/
+staticfiles/
+.venv
+node_modules
+.env
+*.md
+.pytest_cache
+.ruff_cache
+htmlcov
+.coverage

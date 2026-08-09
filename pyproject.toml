@@ -1,0 +1,45 @@
+[project]
+name = "sits"
+version = "0.1.0"
+description = "SITS — Smart Inventory Assistance & Tracking System (SRMS Trust)"
+requires-python = ">=3.12"
+dependencies = [
+    "django~=5.0",
+    "psycopg[binary]~=3.2",
+    "python-decouple~=3.8",
+    "Pillow~=10.4",
+    "redis~=5.0",
+    "celery~=5.4",
+    "django-celery-beat~=2.7",
+    "whitenoise~=6.7",
+    "gunicorn~=22.0",
+    "django-htmx~=1.19",
+    "weasyprint~=62.3",
+    "openpyxl~=3.1",
+    "django-extensions~=3.2",
+]
+
+[dependency-groups]
+dev = [
+    "pytest~=8.3",
+    "pytest-django~=4.9",
+    "pytest-cov~=5.0",
+    "factory-boy~=3.3",
+    "ruff~=0.6",
+    "django-debug-toolbar~=4.4",
+    "ipdb~=0.13",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = ["*/migrations/*", ".claude/*"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "DJ", "UP"]
+ignore = ["DJ001"]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings.test"
+python_files = ["tests.py", "test_*.py"]
+testpaths = ["apps"]
