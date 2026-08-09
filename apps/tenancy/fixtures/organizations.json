@@ -1,0 +1,44 @@
+[
+    {
+        "slug": "ims",
+        "name": "SRMS Institute of Medical Sciences",
+        "short_name": "IMS",
+        "org_type": "INSTITUTE"
+    },
+    {
+        "slug": "cet",
+        "name": "SRMS College of Engineering & Technology",
+        "short_name": "CET",
+        "org_type": "COLLEGE"
+    },
+    {
+        "slug": "nursing",
+        "name": "SRMS College of Nursing",
+        "short_name": "Nursing",
+        "org_type": "COLLEGE"
+    },
+    {
+        "slug": "hotel-management",
+        "name": "SRMS College of Hotel Management",
+        "short_name": "Hotel Mgmt",
+        "org_type": "HOTEL"
+    },
+    {
+        "slug": "business-school",
+        "name": "SRMS Business School",
+        "short_name": "Business School",
+        "org_type": "BUSINESS_SCHOOL"
+    },
+    {
+        "slug": "hospital",
+        "name": "SRMS Hospital",
+        "short_name": "Hospital",
+        "org_type": "HOSPITAL"
+    },
+    {
+        "slug": "riddhima",
+        "name": "Riddhima",
+        "short_name": "Riddhima",
+        "org_type": "VENTURE"
+    }
+]

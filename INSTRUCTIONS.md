@@ -161,17 +161,20 @@ Files:    PROGRESS.md, MEMORY.md, <context files> updated ✓
 ```
 Last updated:     Session 1 (2026-08-09)
 Phase:            1 — Tenancy foundation
-Status:           IN PROGRESS (not yet started coding; Phase 0 is DONE)
-Apps existing:    apps.core (TimeStampedModel, /healthz/)
-Models existing:  none domain-specific yet
-Migrations:       django built-ins + django_celery_beat only
-Tests:            apps/core/tests/test_healthz.py (1 test, passing)
-Docker:           up and healthy — db, redis, web all running; worker/beat behind `async`
-                  profile, not started (Phase 8). Cold-start verified manually by the user
-                  (Claude cannot run `docker compose down -v`, hard-denied — see G-05).
+Status:           IN PROGRESS — all 9 tasks built & tested, not yet gated via /next-phase
+Apps existing:    apps.core (scoping machinery, forms, factories, /healthz/),
+                  apps.tenancy (Organization, Department, User, Membership, middleware,
+                  decorators, org switcher, seed_demo/create_trust_admin)
+Models existing:  tenancy.Organization, tenancy.Department (TenantOwnedModel),
+                  tenancy.User (AUTH_USER_MODEL, USERNAME_FIELD=email), tenancy.Membership
+Migrations:       tenancy 0001_initial, 0002_seed_organizations (7 SRMS orgs from fixture)
+                  + django built-ins + django_celery_beat
+Tests:            19 passing — core/tests/test_healthz.py (1),
+                  tenancy/tests/test_isolation.py (7), tenancy/tests/test_decorators.py (11)
+Docker:           up and healthy. DB was dropped/recreated via psql this session for the
+                  AUTH_USER_MODEL swap (D-13) — approved, narrower than docker compose down -v
 Celery:           wired (config/celery.py), not yet exercised
-Next action:      ask the user Q1-Q3, then start apps/tenancy models (Organization,
-                  Department, User, Membership) — AUTH_USER_MODEL before first migration
-Open blockers:    Q1-Q3 open — blocks the org fixture (Phase 1 task 6) and org-name UI,
-                  not the rest of Phase 1.
+Next action:      run /next-phase to gate Phase 1 closed (needs a user-run cold-start check,
+                  same as Phase 0 — see G-05) and open Phase 2
+Open blockers:    none for Phase 2. Q4-Q8 still open, needed before Phase 5.
 ```

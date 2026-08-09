@@ -9,12 +9,12 @@
 
 | | |
 |---|---|
-| **Last session** | Session 1 (2026-08-09) — Phase 0 closed (cold-start verified by the user manually — see G-05 in `MEMORY.md`); Phase 1 opened |
+| **Last session** | Session 1 (2026-08-09) — Phase 0 closed; Q1–Q3 answered; all 9 Phase 1 tasks built and passing (models, scoping machinery, middleware, decorators, forms, org fixture, seed/create-admin commands, isolation suite, org switcher) |
 | **Current phase** | Phase 1 — Tenancy foundation |
-| **Phase status** | `IN PROGRESS` — not yet started coding |
-| **Next action** | Ask the user Q1–Q3, then start Phase 1 task 1: `apps/tenancy` models (`Organization`, `Department`, `User`, `Membership`), setting `AUTH_USER_MODEL` before the first migration. |
-| **Blockers** | **Q1–Q3 open** — org legal names, store structure, approval thresholds. Task 6 (org fixture) and any org-name-displaying UI cannot proceed without Q1; the rest of Phase 1 can. |
-| **Branch** | `main` — 3 commits (`824a109` scaffold, `2a35217` exec-bit fix, `38173b4` docs) |
+| **Phase status** | `IN PROGRESS` — all tasks complete, acceptance criteria met; **not yet gated** (no `/next-phase` cold-start run this slice) |
+| **Next action** | Run `/next-phase` to gate Phase 1 closed (needs a user-run cold-start check, same as Phase 0 — see G-05) and open Phase 2. |
+| **Blockers** | None. Q4–Q8 still open, needed before Phase 5, not before Phase 2. |
+| **Branch** | `main` — 3 commits so far this phase's work is uncommitted; see below |
 
 ---
 
@@ -23,7 +23,7 @@
 | # | Phase | Status | Started | Done | Notes |
 |---|---|---|---|---|---|
 | 0 | Bootstrap the project | `DONE` | 2026-08-09 | 2026-08-09 | Greenfield (D-11); cold-start verified |
-| 1 | Tenancy foundation | `IN PROGRESS` | 2026-08-09 | — | Custom User must land here — **blocked on Q1–Q3, see below** |
+| 1 | Tenancy foundation | `IN PROGRESS` | 2026-08-09 | — | All 9 tasks built & tested; awaiting `/next-phase` gate |
 | 2 | Migrate models to tenancy | `NOT STARTED` | — | — | The big structural phase |
 | 3 | Access control & org admin | `NOT STARTED` | — | — | Drop `Item.quantity` at the end |
 | 4 | Master data & catalogue | `NOT STARTED` | — | — | |
@@ -73,29 +73,34 @@
 
 ## Phase 1 — task checklist (IN PROGRESS, started 2026-08-09)
 
-> **Blocked on Q1–Q3** (see Open questions below) before task 6 (org fixture) and any UI
-> that displays org names. Tasks 1–5, 7–8 (models, core tenancy machinery, middleware,
-> decorators, forms, management command shells, isolation suite scaffold) do not need the
-> answers and can proceed first.
+All 9 tasks complete; phase gate (`/next-phase`) not yet run this slice.
 
-- [ ] `apps/tenancy/`: `Organization`, `Department`, `User(AbstractUser)`, `Membership`
-      models; `AUTH_USER_MODEL = "tenancy.User"` set before any migration runs
-- [ ] `apps/core/`: `TenantOwnedModel`, `TenantQuerySet`, `TenantManager`,
+- [x] `apps/tenancy/`: `Organization`, `Department`, `User(AbstractUser)`, `Membership`
+      models; `AUTH_USER_MODEL = "tenancy.User"` set before the first migration.
+      `USERNAME_FIELD="email"` per context 01 (see D-13 in `MEMORY.md`)
+- [x] `apps/core/`: `TenantOwnedModel`, `TenantQuerySet`, `TenantManager`,
       `UnscopedQueryError`, `contextvars`-based `get_current_organization` /
-      `set_current_organization` / `clear_current_organization`
-- [ ] `apps/tenancy/middleware.py` — `OrganizationMiddleware` with `try/finally` clear,
-      registered after `AuthenticationMiddleware`
-- [ ] `apps/tenancy/decorators.py` — `require_org_context`, `require_role(*roles,
-      write=False)`, `require_trust_admin`, `get_tenant_object`
-- [ ] `apps/core/forms.py` — `TenantModelForm` with `tenant_fields` narrowing loop
-- [ ] **Data migration** — seven SRMS organisations from a fixture (needs Q1); migrate any
-      seed `UserProfile.role` values into `Membership` against a `DEFAULT_ORG` (N/A —
-      greenfield, no legacy data to migrate, but `DEFAULT_ORG` decision for `seed_demo` still
-      needs recording); superusers get `is_trust_admin=True`
-- [ ] Management commands: `seed_demo`, `create_trust_admin`
-- [ ] `apps/tenancy/tests/test_isolation.py` — auto-discovering parametrised suite (finds 0
-      tenant models right now; that's fine, it must exist and pass)
-- [ ] Org switcher view + navbar dropdown (only when >1 membership or trust admin)
+      `set_current_organization` / `clear_current_organization`. Also added
+      `apps/core/forms.py`, `apps/core/factories.py` (G-06), `apps/core/context_processors.py`
+- [x] `apps/tenancy/middleware.py` — `OrganizationMiddleware` with `try/finally` clear,
+      registered after `AuthenticationMiddleware`; membership resolution follows context 02
+      §5's pinned→default→first-membership order from the start
+- [x] `apps/tenancy/decorators.py` — `require_org_context`, `require_role(*roles,
+      write=False)`, `require_trust_admin`, `get_tenant_object` — all covered by
+      `test_decorators.py` (11 tests)
+- [x] `apps/core/forms.py` — `TenantModelForm` with `tenant_fields` narrowing loop
+- [x] **Data migration** (`apps/tenancy/migrations/0002_seed_organizations.py`) — seven SRMS
+      organisations loaded from `apps/tenancy/fixtures/organizations.json` at migration
+      runtime (never hardcoded in the migration file itself — CLAUDE.md §1); superusers get
+      `is_trust_admin=True`. `DEFAULT_ORG`/legacy-`UserProfile` migration step is N/A —
+      greenfield, see D-13
+- [x] Management commands: `seed_demo` (trust admin + 4 roles × 2 orgs, idempotent, verified),
+      `create_trust_admin`
+- [x] `apps/tenancy/tests/test_isolation.py` — auto-discovering parametrised suite; covers
+      `Department` now (not zero — see the corrected note in `PROMPTS.md` Phase 1). Found and
+      fixed two real bugs in the process — G-06, G-07 in `MEMORY.md`
+- [x] Org switcher view + navbar dropdown (only when >1 membership or trust admin) — smoke
+      tested end-to-end via curl login as a demo user, confirmed org resolves and renders
 
 Phases 2–12 checklists get expanded when each phase starts. Do not pre-expand them —
 they go stale and cost tokens to read.
@@ -110,10 +115,20 @@ manage.py, pyproject.toml, uv.lock, compose.yaml, Makefile, README.md
 docker/web/Dockerfile, docker/entrypoint.sh, docker/nginx/default.conf
 config/{__init__,celery,urls,wsgi,asgi}.py
 config/settings/{__init__,base,dev,prod,test}.py
+templates/base.html, templates/registration/login.html, templates/partials/navbar.html
+
 apps/__init__.py
 apps/core/{__init__,apps,models,views,urls}.py
+apps/core/{managers,context,exceptions,forms,factories,context_processors}.py
 apps/core/migrations/__init__.py
 apps/core/tests/{__init__,test_healthz}.py
+
+apps/tenancy/{__init__,apps,models,admin,middleware,decorators,views,urls,context_processors}.py
+apps/tenancy/migrations/{__init__,0001_initial,0002_seed_organizations}.py
+apps/tenancy/fixtures/organizations.json
+apps/tenancy/management/commands/{seed_demo,create_trust_admin}.py
+apps/tenancy/tests/{__init__,factories,test_isolation,test_decorators}.py
+apps/tenancy/templates/tenancy/{no_access,switch_organization}.html
 ```
 
 Update this tree as apps are created. It is how the next session knows the layout without
@@ -126,7 +141,8 @@ scanning the repo.
 | Suite | Tests | Passing | Coverage |
 |---|---|---|---|
 | core (`/healthz/`) | 1 | 1 | — |
-| tenancy isolation | 0 | — | — |
+| tenancy isolation (`test_isolation.py`) | 7 | 7 | `Department`; other tenant models don't exist yet |
+| tenancy access control (`test_decorators.py`) | 11 | 11 | `require_org_context`, `require_role`, `require_trust_admin`, `get_tenant_object` |
 | catalog | 0 | — | — |
 | inventory | 0 | — | — |
 | procurement | 0 | — | — |
@@ -134,7 +150,7 @@ scanning the repo.
 | assets | 0 | — | — |
 | intelligence | 0 | — | — |
 | alerts | 0 | — | — |
-| **Total** | **1** | **1** | — |
+| **Total** | **19** | **19** | — |
 
 No baseline to carry over — greenfield build, see D-11 in `MEMORY.md`.
 
@@ -192,7 +208,24 @@ Newest first. Keep entries to three lines. Detail belongs in `MEMORY.md`.
   **Phase 0 closed.**
 - Phase 1 (tenancy foundation) opened, checklist expanded; blocked on Q1–Q3 before the org
   fixture task and any org-name UI — rest of Phase 1 can proceed.
-- Next: ask Q1–Q3, then start `apps/tenancy` models.
+- Asked and got Q1–Q3 answered (D-12): org names as-is, multiple stores per org from day
+  one, Trust-wide default + per-org override for approval thresholds.
+- Built all 9 Phase 1 tasks: tenancy models (custom `User`, `Organization`, `Department`,
+  `Membership`), `apps/core` scoping machinery, `OrganizationMiddleware`, decorators,
+  `TenantModelForm`, the org fixture + seed migration, `seed_demo`/`create_trust_admin`,
+  the isolation suite, org switcher + navbar. AUTH_USER_MODEL swap required a DB reset
+  (D-13) — approved, done via `psql` drop/recreate, not `docker compose down -v`.
+- Found and fixed two real bugs while testing: factory-boy hitting the strict manager
+  (G-06), and `TenantManager.for_request()`/`.for_organization()` being unreachable because
+  Django's manager-method wrapper calls the strict `get_queryset()` first (G-07) — this was
+  a bug in context 02's own reference code, now corrected there too.
+- Added `test_decorators.py` (11 tests) since `require_role`/`require_org_context`/
+  `require_trust_admin`/`get_tenant_object` had zero coverage otherwise — CLAUDE.md §3 rule
+  5 territory. 19/19 tests green, ruff clean, no pending migrations.
+- Smoke-tested the full login → middleware → org-switcher flow via curl as a demo user;
+  confirmed org resolution and template rendering work end-to-end.
+- Next: run `/next-phase` to gate Phase 1 closed (needs a user-run cold-start check) and
+  open Phase 2.
 
 ### 2026-XX-XX — Session 0 (setup)
 - Audited the original repo; produced `ANALYSIS.md`

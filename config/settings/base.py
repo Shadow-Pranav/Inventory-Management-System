@@ -27,7 +27,10 @@ INSTALLED_APPS = [
     "django_celery_beat",
     "django_extensions",
     "apps.core",
+    "apps.tenancy",
 ]
+
+AUTH_USER_MODEL = "tenancy.User"
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -36,6 +39,7 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "apps.tenancy.middleware.OrganizationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "django_htmx.middleware.HtmxMiddleware",
@@ -54,6 +58,8 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "apps.core.context_processors.trust_name",
+                "apps.tenancy.context_processors.available_organizations",
             ],
         },
     },

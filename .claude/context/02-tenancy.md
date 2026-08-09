@@ -75,6 +75,14 @@ class OrganizationMiddleware:
 
 `apps/core/managers.py`
 
+> **Corrected in Phase 1** (see G-07 in `MEMORY.md`): `Manager.from_queryset()` generates
+> manager methods that call `self.get_queryset()` first, then chain the requested
+> `TenantQuerySet` method onto it. If `for_request`/`for_organization` are left to that
+> auto-generated wrapper, calling `Model.objects.for_request(request)` hits the *strict*
+> `get_queryset()` override and raises `UnscopedQueryError` before `for_request`'s own
+> `is_trust_scope` handling ever runs — the documented "Trust Admin path" escape hatch is
+> unreachable without the explicit overrides below.
+
 ```python
 class TenantQuerySet(models.QuerySet):
     def for_organization(self, organization):
@@ -103,7 +111,20 @@ class TenantManager(models.Manager.from_queryset(TenantQuerySet)):
                 f"Use .for_request(request), .for_organization(org), or all_objects."
             )
         return qs
+
+    def for_request(self, request):
+        # Bypasses get_queryset()'s strict check on purpose — see the note above.
+        return TenantQuerySet(self.model, using=self._db).for_request(request)
+
+    def for_organization(self, organization):
+        return TenantQuerySet(self.model, using=self._db).for_organization(organization)
 ```
+
+On `TenantOwnedModel` itself, `objects` (the strict `TenantManager`) must stay the
+first-declared manager, ahead of `all_objects` — Django uses the first-declared manager as
+`_default_manager` internally (some admin/reverse-relation code paths), and that must be the
+strict one, never the unscoped `all_objects`. This is deliberately against Ruff's `DJ012`
+style rule; the model file suppresses it with `# noqa: DJ012` and a comment, not silently.
 
 Two escape hatches, both deliberate and both greppable:
 - `Model.all_objects` — the plain manager. Permitted **only** in the tenancy layer, Django

@@ -109,6 +109,28 @@ settings — likely a Django setting or a Trust-scoped config row, not yet decid
 whether the Trust-wide default is a `settings.py` constant or a proper model (matters if the
 Trust Admin should be able to change it without a deploy).
 
+### D-13 · Phase 1 implementation decisions
+**Date:** Session 1 (2026-08-09) · **Status:** Active
+**AUTH_USER_MODEL swap required a DB reset.** Phase 0 had already applied Django's default
+`auth.User` migrations. Swapping `AUTH_USER_MODEL` after that is the exact painful migration
+D-03 warned about (the `admin_logentry` FK was already bound to the old `auth_user` table).
+With no real data yet, dropped and recreated the `sits` database via `psql` (not
+`docker compose down -v` — narrower, and not blocked by G-05) and ran `migrate` fresh.
+**`USERNAME_FIELD = "email"`, `REQUIRED_FIELDS = ["username"]`** on `tenancy.User` — context
+01 says email is "the login identifier"; this is the literal Django mechanism for that.
+`username` stays as a required-but-secondary field (Django admin/`createsuperuser`
+conventions expect *some* unique display handle), not removed.
+**`Organization.org_type` for Riddhima is a guess (`VENTURE`).** Nothing in `CLAUDE.md` or
+the user's Q1 answer specifies what kind of entity Riddhima is — the other six orgs map
+cleanly to the `OrgType` choices, Riddhima doesn't obviously. Flagged, not blocking (org_type
+isn't load-bearing for anything yet), but confirm with the user before it drives any
+type-specific behaviour (e.g. Phase 7's compliance template seeding "per org_type").
+**"DEFAULT_ORG" from the original Phase 1 brief is N/A.** That task was about migrating
+legacy `UserProfile.role` rows into `Membership` against a fallback org — moot per D-11
+(greenfield, no legacy rows). No `DEFAULT_ORG` concept exists in this codebase.
+**`Membership.stores` (M2M to `inventory.Location`) is deferred to Phase 2** — the app
+doesn't exist yet to reference. Noted inline in `apps/tenancy/models.py` and in context 01.
+
 ### D-10 · Compliance registers are per-organisation
 **Why:** A hospital's biomedical-waste obligations and a hotel-management college's FSSAI
 licensing have nothing in common. A Trust-wide fixed register would be wrong for every
@@ -240,6 +262,40 @@ cold-start check. Don't spend a turn retrying it — ask the user to run it dire
 time a phase gate needs it, same as this session did. Only remove the deny rule if the user
 explicitly asks to relax it (they were offered that option this session and declined).
 
+### G-06 · factory-boy's default `_create` can't create `TenantOwnedModel` rows
+**Phase:** 1 · **Date:** 2026-08-09
+**Symptom:** `DepartmentFactory()` in a test raised `UnscopedQueryError`, even though the
+test never called `Department.objects` directly.
+**Cause:** `factory.django.DjangoModelFactory._create` calls `model_class._default_manager
+.create(...)`, i.e. `Department.objects.create(...)`. `objects` is the strict
+`TenantManager`, which raises with no active-organization contextvar set — exactly right
+for application code, but factories legitimately have no request/contextvar at all.
+**Fix:** `apps/core/factories.py::TenantModelFactory` is now the required base for any
+`TenantOwnedModel` factory; it overrides `_create` to go through `all_objects` instead.
+**Watch for:** every new tenant-owned model's factory (Phase 2 onward: `Item`, `Category`,
+`StockLevel`, ...) must inherit `TenantModelFactory`, not `factory.django.DjangoModelFactory`
+directly, or it hits this same wall.
+
+### G-07 · `TenantManager.for_request()`/`.for_organization()` were unreachable
+**Phase:** 1 · **Date:** 2026-08-09
+**Symptom:** Isolation suite tests calling `Model.objects.for_request(request)` with
+`is_trust_scope=True` (and no contextvar set) raised `UnscopedQueryError` instead of
+returning the unscoped trust-admin queryset context 02 documents.
+**Cause:** `TenantManager(models.Manager.from_queryset(TenantQuerySet))`'s auto-generated
+`for_request`/`for_organization` wrapper methods call `self.get_queryset()` first (my
+strict override), then chain the real `TenantQuerySet` method onto the *result*. Since
+`get_queryset()` raises whenever the contextvar is unset and `STRICT_TENANCY` is on, the
+manager-level `.for_request()`/`.for_organization()` calls documented in context 02 as "the
+Trust Admin path" could never run their own `is_trust_scope` logic — they'd raise first,
+every time, unless the contextvar happened to already agree with what you were asking for.
+**Fix:** `TenantManager` now explicitly overrides both methods to build a fresh
+`TenantQuerySet(self.model, using=self._db)` and call the real method on *that*, bypassing
+`get_queryset()` entirely. `context/02-tenancy.md` §2 updated to match — the code block
+there was the literal source of the bug, not just this repo's implementation of it.
+**Watch for:** any other `TenantQuerySet` method meant to be an explicit, self-scoping entry
+point (not dependent on the ambient contextvar) needs the same override treatment on
+`TenantManager`, or it will silently inherit the strict `get_queryset()` gate.
+
 Template:
 
 ```
@@ -264,6 +320,8 @@ Things deliberately not decided yet, so nobody assumes they were overlooked.
 | X-03 | Fiscal-year rollover / opening-balance carry-forward mechanics | Needs Q3 answered | Phase 5 |
 | X-04 | Whether the hospital pharmacy is in scope or a separate HMIS owns it | Needs Q4 answered | Phase 5 |
 | X-05 | Data retention for `StockMovement` and `AuditLog` | No regulatory input yet | Phase 12 |
+| X-06 | `Membership.stores` M2M to `inventory.Location` | `apps.inventory` doesn't exist until Phase 2 | Phase 2, alongside `Location` |
+| X-07 | Is Riddhima's `org_type` really `VENTURE`? Guessed, not confirmed (see D-13) | Not load-bearing yet | Before Phase 7 (compliance templates key off `org_type`) |
 
 ---
 
@@ -275,6 +333,6 @@ Things deliberately not decided yet, so nobody assumes they were overlooked.
 - Wants **maximum reuse** of the existing codebase. Rewrites need justification; refactors
   do not.
 - Wants the system to work identically on any machine via Docker.
-- Institution names are user-supplied and unverified — confirm before treating as canonical.
+- Institution names confirmed 2026-08-09 (Q1, D-12) — the 7 in `CLAUDE.md` §1 are final.
 - Timezone `Asia/Kolkata`; currency INR; Indian fiscal year (April–March); GST applies to
   procurement documents.

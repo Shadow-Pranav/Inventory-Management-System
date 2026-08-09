@@ -85,8 +85,11 @@ machinery is in place and tested. No feature code uses it yet.
 7. Management commands: `seed_demo` (orgs, departments, users per role, sample masters) and
    `create_trust_admin`.
 8. `apps/tenancy/tests/test_isolation.py` — the auto-discovering parametrised suite from
-   context 02 §6. It will find zero tenant models right now. That is fine; it must exist and
-   pass so that Phase 2 lights it up.
+   context 02 §6. `Department` is tenant-owned (context 01 marks it `*`) so the suite covers
+   it immediately, not zero models — the manager/queryset-level assertions (org-scoped
+   filtering, trust-admin sees all, unscoped access raises) run now; the view-level ones
+   (404-not-403, cross-org FK POST rejection, auditor write-403, search leak) wait for real
+   CRUD views (Phase 3 for Department) and are skipped with a clear reason until then.
 9. Org switcher view + navbar dropdown, rendered only when the user has >1 membership or is
    a trust admin.
 

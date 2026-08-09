@@ -1,0 +1,48 @@
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="/">SITS</a>
+        {% if user.is_authenticated %}
+        <div class="d-flex align-items-center ms-auto gap-3">
+            {% if user.is_trust_admin or user.memberships.count > 1 %}
+            <div class="dropdown">
+                <button class="btn btn-outline-light btn-sm dropdown-toggle" type="button"
+                        data-bs-toggle="dropdown" aria-expanded="false">
+                    {% if request.is_trust_scope %}
+                        All organisations
+                    {% elif request.organization %}
+                        {{ request.organization.short_name }}
+                    {% else %}
+                        Choose organisation
+                    {% endif %}
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    <li>
+                        <form method="post" action="{% url 'tenancy:switch_organization' %}">
+                            {% csrf_token %}
+                            <input type="hidden" name="next" value="{{ request.path }}">
+                            {% if user.is_trust_admin %}
+                            <button class="dropdown-item" type="submit" name="organization_id" value="">
+                                All organisations
+                            </button>
+                            {% endif %}
+                            {% for org in available_organizations %}
+                            <button class="dropdown-item" type="submit" name="organization_id" value="{{ org.pk }}">
+                                {{ org.short_name }}
+                            </button>
+                            {% endfor %}
+                        </form>
+                    </li>
+                </ul>
+            </div>
+            {% elif request.organization %}
+            <span class="navbar-text text-light">{{ request.organization.short_name }}</span>
+            {% endif %}
+            <span class="navbar-text text-light">{{ user.get_full_name|default:user.email }}</span>
+            <form method="post" action="{% url 'logout' %}" class="d-inline">
+                {% csrf_token %}
+                <button class="btn btn-outline-light btn-sm" type="submit">Log out</button>
+            </form>
+        </div>
+        {% endif %}
+    </div>
+</nav>

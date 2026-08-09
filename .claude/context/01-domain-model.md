@@ -63,7 +63,9 @@ class Membership                               # user × organisation, carries t
     user, organization
     role ∈ {ORG_ADMIN, STORE_MANAGER, DEPT_STAFF, AUDITOR}
     department = FK(Department, null=True)     # required when role == DEPT_STAFF
-    stores = M2M("inventory.Location", blank=True)   # STORE_MANAGER scope narrowing
+    # stores = M2M("inventory.Location", blank=True)   # STORE_MANAGER scope narrowing
+    # ^ deferred until apps.inventory exists (Phase 2) — inventory.Location can't be
+    #   referenced before the app is installed. Add the field + a migration in Phase 2.
     is_active
     Meta: UniqueConstraint(["user", "organization"])
 ```

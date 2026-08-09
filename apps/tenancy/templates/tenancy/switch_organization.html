@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Switch organisation{% endblock %}
+{% block content %}
+<h1 class="h4 mb-3">Switch organisation</h1>
+<form method="post">
+    {% csrf_token %}
+    <div class="list-group" style="max-width: 400px;">
+        {% if user.is_trust_admin %}
+        <button class="list-group-item list-group-item-action" type="submit"
+                name="organization_id" value="">
+            All organisations (Trust view)
+        </button>
+        {% endif %}
+        {% for org in available_organizations %}
+        <button class="list-group-item list-group-item-action" type="submit"
+                name="organization_id" value="{{ org.pk }}">
+            {{ org.short_name }} — {{ org.name }}
+        </button>
+        {% empty %}
+        <p class="text-muted">You have no active organisation memberships.</p>
+        {% endfor %}
+    </div>
+</form>
+{% endblock %}
