@@ -14,7 +14,7 @@
 | **Phase status** | `IN PROGRESS` — all tasks complete, acceptance criteria met; **not yet gated** (no `/next-phase` cold-start run this slice) |
 | **Next action** | Run `/next-phase` to gate Phase 2 closed (needs a user-run cold-start check — G-05) and open Phase 3. |
 | **Blockers** | None. Q4–Q8 still open, needed before Phase 5. |
-| **Branch** | `main` — 7 commits so far (`824a109` … `ee6d01f`); Phase 2 work not yet committed |
+| **Branch** | `main` — 8 commits (`824a109` … `7716888` Phase 2); tree clean |
 
 ---
 
