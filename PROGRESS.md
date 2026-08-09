@@ -144,16 +144,16 @@ No baseline to carry over — greenfield build, see D-11 in `MEMORY.md`.
 
 | # | Question | Status | Answer |
 |---|---|---|---|
-| Q1 | Exact legal names of all organisations under SRMS Trust? Current list is 7 — is it complete? | **OPEN** | |
-| Q2 | Does each institution have one central store or several sub-stores per department? | **OPEN** | |
-| Q3 | Approval thresholds for POs — fixed Trust-wide, or per institution? | **OPEN** | |
+| Q1 | Exact legal names of all organisations under SRMS Trust? Current list is 7 — is it complete? | **ANSWERED** (2026-08-09) | Use the 7 names in `CLAUDE.md` §1 verbatim (IMS, CET, Nursing, Hotel Management, Business School, Hospital, Riddhima). |
+| Q2 | Does each institution have one central store or several sub-stores per department? | **ANSWERED** (2026-08-09) | Multiple stores per org from day one — `inventory.Location` is a real hierarchy from Phase 2, not a single `MAIN_STORE` default. See D-12 in `MEMORY.md`. |
+| Q3 | Approval thresholds for POs — fixed Trust-wide, or per institution? | **ANSWERED** (2026-08-09) | Trust-wide default, per-org override in `organization.settings["approval_thresholds"]`. Confirms the design already sketched in Phase 5 of `PROMPTS.md`. See D-12. |
 | Q4 | Is the hospital's pharmacy/drug inventory in scope, or does it use a separate HMIS? | **OPEN** | |
 | Q5 | Existing supplier/item master data to import, or start clean? | **OPEN** | |
 | Q6 | Do institutions ever share stock, or is inter-org transfer purely theoretical? | **OPEN** | |
 | Q7 | Deployment target — Trust's own server, cloud VM, or local network only? | **OPEN** | |
 | Q8 | Barcode scanners available, or is a phone camera the realistic input device? | **OPEN** | |
 
-Ask Q1–Q3 before Phase 1. Q4–Q8 can wait but should be resolved before Phase 5.
+Q1–Q3 answered — Phase 1 unblocked. Q4–Q8 can wait but should be resolved before Phase 5.
 
 ---
 

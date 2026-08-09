@@ -91,6 +91,24 @@ the user directly; they confirmed: **build fresh, no original repo to preserve o
 **Revisit if:** the user later supplies the original repo and wants specific pieces ported —
 treat that as new, scoped work, not a reversal of this decision.
 
+### D-12 · Answers to Q1–Q3 (org names, store structure, approval thresholds)
+**Date:** Session 1 (2026-08-09) · **Status:** Active
+**Q1 — Organisation names:** the 7 organisations in `CLAUDE.md` §1 are final, used verbatim
+in the seed fixture. No 8th org, no name changes.
+**Q2 — Store structure:** institutions run **multiple stores per org**, not one central
+store each. **Consequence:** `inventory.Location` (Phase 2) must be a real hierarchy from
+its first migration — do not build a single `MAIN_STORE`-per-org default and generalise
+later; the "opening stock against a default location" step in old Phase 2 drafts doesn't
+apply as written. `seed_demo` (Phase 1) should create more than one `Location` per demo org
+so Phase 2+ testing exercises multi-store from the start, not as an afterthought.
+**Q3 — Approval thresholds:** Trust-wide default, per-org override. **Consequence:**
+`organization.settings["approval_thresholds"]` (already anticipated in Phase 5 of
+`PROMPTS.md`) holds the *override*; a Trust-wide default lives outside any single org's
+settings — likely a Django setting or a Trust-scoped config row, not yet decided which.
+**Revisit at:** Phase 5, when `PurchaseOrder` approval is actually built — decide then
+whether the Trust-wide default is a `settings.py` constant or a proper model (matters if the
+Trust Admin should be able to change it without a deploy).
+
 ### D-10 · Compliance registers are per-organisation
 **Why:** A hospital's biomedical-waste obligations and a hotel-management college's FSSAI
 licensing have nothing in common. A Trust-wide fixed register would be wrong for every
