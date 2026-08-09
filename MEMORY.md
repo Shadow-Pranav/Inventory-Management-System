@@ -296,6 +296,27 @@ there was the literal source of the bug, not just this repo's implementation of 
 point (not dependent on the ambient contextvar) needs the same override treatment on
 `TenantManager`, or it will silently inherit the strict `get_queryset()` gate.
 
+### G-08 · `web` container crashes with `OSError: No such device` on the Windows host
+**Phase:** 2 · **Date:** 2026-08-09
+**Symptom:** `docker compose exec web pytest` failed with `service "web" is not running`.
+`docker compose ps -a` showed `web` `Exited (1)`. Logs: Django's dev-server autoreloader
+crashed — `OSError: [Errno 19] No such device: '/app/apps/tenancy/templates'` — while
+`snapshot_files()` was mid-glob over a bind-mounted directory. Restarting just the `web`
+service then failed too, with `Error response from daemon: error while creating mount
+source path '/run/desktop/mnt/host/h/...': mkdir ... file exists`.
+**Cause:** Docker Desktop's Windows file-sharing layer (the `/run/desktop/mnt/host/...`
+bind-mount plumbing) got into a bad state — not caused by anything in this repo's code or
+config. `runserver`'s autoreloader is especially exposed to this because it polls the whole
+bind-mounted tree every second; any hiccup in the host↔container filesystem bridge surfaces
+there first, well before a normal request would notice.
+**Fix:** Restarting Docker Desktop itself (not just the container) cleared the stuck mount
+path. `docker compose up -d web` then started cleanly. `db`/`redis` volumes and data were
+untouched throughout — this is a file-sharing plumbing issue, not a data issue.
+**Watch for:** if `web` (or any bind-mounted service) exits unexpectedly with an `OSError`
+mentioning `/run/desktop/mnt/host/...` or "No such device", don't debug it as an app bug —
+restart Docker Desktop first and retry. Seen after the machine had been idle; may correlate
+with sleep/resume or long idle periods on this Windows host.
+
 Template:
 
 ```
