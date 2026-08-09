@@ -9,12 +9,12 @@
 
 | | |
 |---|---|
-| **Last session** | Session 1 (2026-08-09) — Phase 0 and Phase 1 both closed (gates passed, cold-start verified by the user each time); Phase 2 opened |
+| **Last session** | Session 1 (2026-08-09) — Phase 0 and Phase 1 both closed (gates passed, cold-start verified by the user each time); Phase 2 opened, no code written yet |
 | **Current phase** | Phase 2 — Catalogue & inventory models |
 | **Phase status** | `IN PROGRESS` — not yet started coding |
 | **Next action** | Start Phase 2 task 1: `apps/catalog/` models (`Category`, `Item`, `UnitOfMeasure`, `Supplier`, `ItemSupplier`), org-scoped `UniqueConstraint`s from the first migration. |
 | **Blockers** | None. Q4–Q8 still open, needed before Phase 5. |
-| **Branch** | `main` — 5 commits (`824a109`, `2a35217`, `38173b4`, `74282ba`, `5b49348`) |
+| **Branch** | `main` — 6 commits (`824a109` … `74062af`); tree clean, nothing uncommitted |
 
 ---
 
@@ -255,6 +255,10 @@ Newest first. Keep entries to three lines. Detail belongs in `MEMORY.md`.
   just Phase 0). Full gate green on the fresh volume — migrations, 19/19 tests, isolation
   subset, ruff, `seed_demo`. CLAUDE.md §7 DoD walked, no gaps. **Phase 1 closed.**
 - Phase 2 (catalogue & inventory models) opened, checklist expanded. No blockers.
+- `/checkpoint`: `web` container crashed on a Docker Desktop Windows file-sharing glitch
+  (`OSError: No such device`, then a stuck mount path) — unrelated to app code. Restarting
+  Docker Desktop fixed it; `db`/`redis` data untouched throughout. Recorded as G-08.
+- No Phase 2 code written yet this session — checkpoint/session-end landed mid-transition.
 - Next: `apps/catalog/` models.
 
 ### 2026-XX-XX — Session 0 (setup)
