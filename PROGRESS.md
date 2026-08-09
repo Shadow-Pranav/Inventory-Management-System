@@ -9,12 +9,12 @@
 
 | | |
 |---|---|
-| **Last session** | Session 1 (2026-08-09) — confirmed greenfield build (D-11), scaffolded the whole Phase 0 stack, stack is up and healthy |
-| **Current phase** | Phase 0 — Bootstrap the project |
-| **Phase status** | `IN PROGRESS` — one item left (see below) |
-| **Next action** | Run the cold-start check (`docker compose down -v && docker compose up --build`, needs explicit confirmation — destroys the dev volumes), then Phase 0 is done and Phase 1 (tenancy foundation) can start. |
-| **Blockers** | None for finishing Phase 0. Q1–Q3 (org names, store structure, approval thresholds) are open; answer before Phase 1 starts. |
-| **Branch** | `main` — 2 commits (`824a109` scaffold, `2a35217` entrypoint.sh exec-bit fix) |
+| **Last session** | Session 1 (2026-08-09) — Phase 0 closed (cold-start verified by the user manually — see G-05 in `MEMORY.md`); Phase 1 opened |
+| **Current phase** | Phase 1 — Tenancy foundation |
+| **Phase status** | `IN PROGRESS` — not yet started coding |
+| **Next action** | Ask the user Q1–Q3, then start Phase 1 task 1: `apps/tenancy` models (`Organization`, `Department`, `User`, `Membership`), setting `AUTH_USER_MODEL` before the first migration. |
+| **Blockers** | **Q1–Q3 open** — org legal names, store structure, approval thresholds. Task 6 (org fixture) and any org-name-displaying UI cannot proceed without Q1; the rest of Phase 1 can. |
+| **Branch** | `main` — 3 commits (`824a109` scaffold, `2a35217` exec-bit fix, `38173b4` docs) |
 
 ---
 
@@ -22,8 +22,8 @@
 
 | # | Phase | Status | Started | Done | Notes |
 |---|---|---|---|---|---|
-| 0 | Bootstrap the project | `IN PROGRESS` | 2026-08-09 | — | Greenfield (D-11); stack up and healthy, cold-start check outstanding |
-| 1 | Tenancy foundation | `NOT STARTED` | — | — | Custom User must land here |
+| 0 | Bootstrap the project | `DONE` | 2026-08-09 | 2026-08-09 | Greenfield (D-11); cold-start verified |
+| 1 | Tenancy foundation | `IN PROGRESS` | 2026-08-09 | — | Custom User must land here — **blocked on Q1–Q3, see below** |
 | 2 | Migrate models to tenancy | `NOT STARTED` | — | — | The big structural phase |
 | 3 | Access control & org admin | `NOT STARTED` | — | — | Drop `Item.quantity` at the end |
 | 4 | Master data & catalogue | `NOT STARTED` | — | — | |
@@ -36,13 +36,15 @@
 | 11 | API & integrations | `NOT STARTED` | — | — | Optional for v1 |
 | 12 | Hardening & deployment | `NOT STARTED` | — | — | |
 
-**Overall: 0 / 13 phases complete.**
+**Overall: 1 / 13 phases complete.**
 
 ---
 
-## Phase 0 — task checklist
+## Phase 0 — task checklist (DONE, 2026-08-09)
 
-- [x] `git init` (no commit yet — commits are made only when you ask)
+<details><summary>All 16 items complete — expand for the record</summary>
+
+- [x] `git init`
 - [x] `pyproject.toml` + `uv.lock`
 - [x] `docker/web/Dockerfile` (multi-stage; venv at `/opt/venv`, see G-01/G-02 in `MEMORY.md`)
 - [x] `docker/entrypoint.sh` (executable bit set, LF endings — had to be fixed in a follow-up
@@ -63,11 +65,39 @@
 - [x] `Makefile`
 - [x] `pytest -q` green (1 test), `ruff check .` clean, `ruff format --check .` clean,
       `makemigrations --check --dry-run` clean
-- [ ] Cold-start verified: `docker compose down -v && docker compose up --build` — **not yet
-      run**; the tool call was denied when attempted this session. Run it before calling
-      Phase 0 done.
+- [x] Cold-start verified: `docker compose down -v && docker compose up --build` — this
+      command is hard-denied in `.claude/settings.json` for Claude to run directly; the user
+      ran it manually and confirmed a clean start. `/healthz/` re-checked afterward → 200.
 
-Phases 1–12 checklists get expanded when each phase starts. Do not pre-expand them —
+</details>
+
+## Phase 1 — task checklist (IN PROGRESS, started 2026-08-09)
+
+> **Blocked on Q1–Q3** (see Open questions below) before task 6 (org fixture) and any UI
+> that displays org names. Tasks 1–5, 7–8 (models, core tenancy machinery, middleware,
+> decorators, forms, management command shells, isolation suite scaffold) do not need the
+> answers and can proceed first.
+
+- [ ] `apps/tenancy/`: `Organization`, `Department`, `User(AbstractUser)`, `Membership`
+      models; `AUTH_USER_MODEL = "tenancy.User"` set before any migration runs
+- [ ] `apps/core/`: `TenantOwnedModel`, `TenantQuerySet`, `TenantManager`,
+      `UnscopedQueryError`, `contextvars`-based `get_current_organization` /
+      `set_current_organization` / `clear_current_organization`
+- [ ] `apps/tenancy/middleware.py` — `OrganizationMiddleware` with `try/finally` clear,
+      registered after `AuthenticationMiddleware`
+- [ ] `apps/tenancy/decorators.py` — `require_org_context`, `require_role(*roles,
+      write=False)`, `require_trust_admin`, `get_tenant_object`
+- [ ] `apps/core/forms.py` — `TenantModelForm` with `tenant_fields` narrowing loop
+- [ ] **Data migration** — seven SRMS organisations from a fixture (needs Q1); migrate any
+      seed `UserProfile.role` values into `Membership` against a `DEFAULT_ORG` (N/A —
+      greenfield, no legacy data to migrate, but `DEFAULT_ORG` decision for `seed_demo` still
+      needs recording); superusers get `is_trust_admin=True`
+- [ ] Management commands: `seed_demo`, `create_trust_admin`
+- [ ] `apps/tenancy/tests/test_isolation.py` — auto-discovering parametrised suite (finds 0
+      tenant models right now; that's fine, it must exist and pass)
+- [ ] Org switcher view + navbar dropdown (only when >1 membership or trust admin)
+
+Phases 2–12 checklists get expanded when each phase starts. Do not pre-expand them —
 they go stale and cost tokens to read.
 
 ---
@@ -157,9 +187,12 @@ Newest first. Keep entries to three lines. Detail belongs in `MEMORY.md`.
 - Stack is up and healthy: `/healthz/` → 200, admin loads, superuser `admin` created,
   `pytest`/`ruff`/`makemigrations --check` all clean. Committed in 2 commits (824a109,
   2a35217).
-- Cold-start check (`down -v && up --build`) not yet run — attempted, tool call was denied.
-- Next: get the cold-start check approved and run, then close Phase 0 and start Phase 1
-  (after Q1–Q3 are answered).
+- `docker compose down -v` is hard-denied in `.claude/settings.json` (not just ask-listed —
+  see G-05 in `MEMORY.md`); user ran the cold-start check manually and confirmed clean.
+  **Phase 0 closed.**
+- Phase 1 (tenancy foundation) opened, checklist expanded; blocked on Q1–Q3 before the org
+  fixture task and any org-name UI — rest of Phase 1 can proceed.
+- Next: ask Q1–Q3, then start `apps/tenancy` models.
 
 ### 2026-XX-XX — Session 0 (setup)
 - Audited the original repo; produced `ANALYSIS.md`

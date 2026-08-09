@@ -160,16 +160,18 @@ Files:    PROGRESS.md, MEMORY.md, <context files> updated ✓
 
 ```
 Last updated:     Session 1 (2026-08-09)
-Phase:            0 — Bootstrap the project
-Status:           IN PROGRESS (one item left: cold-start check)
+Phase:            1 — Tenancy foundation
+Status:           IN PROGRESS (not yet started coding; Phase 0 is DONE)
 Apps existing:    apps.core (TimeStampedModel, /healthz/)
 Models existing:  none domain-specific yet
 Migrations:       django built-ins + django_celery_beat only
 Tests:            apps/core/tests/test_healthz.py (1 test, passing)
 Docker:           up and healthy — db, redis, web all running; worker/beat behind `async`
-                  profile, not started (Phase 8)
+                  profile, not started (Phase 8). Cold-start verified manually by the user
+                  (Claude cannot run `docker compose down -v`, hard-denied — see G-05).
 Celery:           wired (config/celery.py), not yet exercised
-Next action:      get `docker compose down -v && docker compose up --build` approved and
-                  run (cold-start check), then close Phase 0 and start Phase 1
-Open blockers:    Q1-Q3 open, do not block Phase 0, answer before Phase 1.
+Next action:      ask the user Q1-Q3, then start apps/tenancy models (Organization,
+                  Department, User, Membership) — AUTH_USER_MODEL before first migration
+Open blockers:    Q1-Q3 open — blocks the org fixture (Phase 1 task 6) and org-name UI,
+                  not the rest of Phase 1.
 ```

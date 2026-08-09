@@ -205,6 +205,23 @@ management commands invoked directly, other entrypoints) needs the same
 the next commit. Worth checking with `git ls-files -s <path>` (look for `100755`) after
 adding any new `*.sh` file, not just trusting the local filesystem.
 
+### G-05 · `docker compose down -v` cannot be run by Claude, ever, in this project
+**Phase:** 0 · **Date:** 2026-08-09
+**Symptom:** Attempted `docker compose down -v` for the Phase 0 cold-start gate check twice
+(once mid-session, once at `/next-phase`); both times the Bash tool call was denied, even
+after the user explicitly approved it via an in-chat question.
+**Cause:** `.claude/settings.json` has `"Bash(docker compose down -v)"` in the **deny** list,
+not the ask-list. A deny-list entry is enforced by the harness itself and cannot be overridden
+by an in-conversation approval — `AskUserQuestion` and the actual tool-permission gate are
+different mechanisms. `SETUP-README.md`'s description ("Claude will ask you first each time")
+does not match this behaviour; the file is aspirational/stale on this point.
+**Fix:** there is no fix that keeps the deny rule intact — the user has to run this exact
+command themselves in their own terminal and report back. That's what happened here.
+**Watch for:** every future phase's gate check (`/next-phase`, `/verify-tenancy`) calls for a
+cold-start check. Don't spend a turn retrying it — ask the user to run it directly the first
+time a phase gate needs it, same as this session did. Only remove the deny rule if the user
+explicitly asks to relax it (they were offered that option this session and declined).
+
 Template:
 
 ```
