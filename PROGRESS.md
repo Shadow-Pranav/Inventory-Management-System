@@ -9,12 +9,12 @@
 
 | | |
 |---|---|
-| **Last session** | Session 1 (2026-08-09) — Phase 0 closed; Q1–Q3 answered; all 9 Phase 1 tasks built and passing (models, scoping machinery, middleware, decorators, forms, org fixture, seed/create-admin commands, isolation suite, org switcher) |
-| **Current phase** | Phase 1 — Tenancy foundation |
-| **Phase status** | `IN PROGRESS` — all tasks complete, acceptance criteria met; **not yet gated** (no `/next-phase` cold-start run this slice) |
-| **Next action** | Run `/next-phase` to gate Phase 1 closed (needs a user-run cold-start check, same as Phase 0 — see G-05) and open Phase 2. |
-| **Blockers** | None. Q4–Q8 still open, needed before Phase 5, not before Phase 2. |
-| **Branch** | `main` — 4 commits (`824a109`, `2a35217`, `38173b4`, `74282ba` Phase 1) |
+| **Last session** | Session 1 (2026-08-09) — Phase 0 and Phase 1 both closed (gates passed, cold-start verified by the user each time); Phase 2 opened |
+| **Current phase** | Phase 2 — Catalogue & inventory models |
+| **Phase status** | `IN PROGRESS` — not yet started coding |
+| **Next action** | Start Phase 2 task 1: `apps/catalog/` models (`Category`, `Item`, `UnitOfMeasure`, `Supplier`, `ItemSupplier`), org-scoped `UniqueConstraint`s from the first migration. |
+| **Blockers** | None. Q4–Q8 still open, needed before Phase 5. |
+| **Branch** | `main` — 5 commits (`824a109`, `2a35217`, `38173b4`, `74282ba`, `5b49348`) |
 
 ---
 
@@ -23,8 +23,8 @@
 | # | Phase | Status | Started | Done | Notes |
 |---|---|---|---|---|---|
 | 0 | Bootstrap the project | `DONE` | 2026-08-09 | 2026-08-09 | Greenfield (D-11); cold-start verified |
-| 1 | Tenancy foundation | `IN PROGRESS` | 2026-08-09 | — | All 9 tasks built & tested; awaiting `/next-phase` gate |
-| 2 | Migrate models to tenancy | `NOT STARTED` | — | — | The big structural phase |
+| 1 | Tenancy foundation | `DONE` | 2026-08-09 | 2026-08-09 | Gate passed cold-start, 19/19 tests, DoD walked |
+| 2 | Catalogue & inventory models | `IN PROGRESS` | 2026-08-09 | — | Tenancy-scoped from the first migration (greenfield, D-11) |
 | 3 | Access control & org admin | `NOT STARTED` | — | — | Drop `Item.quantity` at the end |
 | 4 | Master data & catalogue | `NOT STARTED` | — | — | |
 | 5 | Procurement (Req→PO→GRN) | `NOT STARTED` | — | — | |
@@ -36,7 +36,7 @@
 | 11 | API & integrations | `NOT STARTED` | — | — | Optional for v1 |
 | 12 | Hardening & deployment | `NOT STARTED` | — | — | |
 
-**Overall: 1 / 13 phases complete.**
+**Overall: 2 / 13 phases complete.**
 
 ---
 
@@ -71,9 +71,9 @@
 
 </details>
 
-## Phase 1 — task checklist (IN PROGRESS, started 2026-08-09)
+## Phase 1 — task checklist (DONE, 2026-08-09)
 
-All 9 tasks complete; phase gate (`/next-phase`) not yet run this slice.
+<details><summary>All 9 tasks complete, gate passed — expand for the record</summary>
 
 - [x] `apps/tenancy/`: `Organization`, `Department`, `User(AbstractUser)`, `Membership`
       models; `AUTH_USER_MODEL = "tenancy.User"` set before the first migration.
@@ -101,8 +101,35 @@ All 9 tasks complete; phase gate (`/next-phase`) not yet run this slice.
       fixed two real bugs in the process — G-06, G-07 in `MEMORY.md`
 - [x] Org switcher view + navbar dropdown (only when >1 membership or trust admin) — smoke
       tested end-to-end via curl login as a demo user, confirmed org resolves and renders
+- [x] Phase gate: cold-start (`down -v && up --build`, user-run — G-05), `makemigrations
+      --check`, `pytest` (19/19), `pytest -k isolation` (7/7), `ruff check`/`format --check`,
+      `seed_demo` all clean on the fresh volume. CLAUDE.md §7 DoD walked, no gaps.
 
-Phases 2–12 checklists get expanded when each phase starts. Do not pre-expand them —
+</details>
+
+## Phase 2 — task checklist (IN PROGRESS, started 2026-08-09)
+
+> Greenfield (D-11): building `catalog`/`inventory` directly, tenancy-scoped from the first
+> migration — no `RenameModel` off a legacy `ims_app`. No `quantity` field on `Item`, ever
+> (D-05) — `StockLevel` is the balance from day one.
+
+- [ ] `apps/catalog/`: `Category`, `Item` (no `quantity`), `UnitOfMeasure`, `Supplier`,
+      `ItemSupplier` — org-scoped `UniqueConstraint`s on `Item.name`, `Item.sku`,
+      `Category.name` from the first migration (F-01's lesson, applied proactively)
+- [ ] `apps/inventory/`: `Location` (real hierarchy per D-12/Q2 — multiple stores per org,
+      not a single `MAIN_STORE` default), `StockLevel`, `StockMovement` (the ledger,
+      `balance_after` per F-03), `Batch`, `SerialUnit`
+- [ ] `apps/inventory/services.py::apply_movement()` per context 04 §2 — the only writer of
+      `StockLevel.quantity`, `transaction.atomic()` + `select_for_update()`
+- [ ] `apps/issuance/`: `IssueRequest`, `IssueItem` (built directly — no `Order` to rename)
+- [ ] Views/forms/templates: category tree, item CRUD + detail, stock level view, manual
+      stock adjustment (routed through `apply_movement()`), issue-request raise/list —
+      `TenantModelForm` with `tenant_fields`, templates at `apps/<app>/templates/<app>/`
+- [ ] Extend the isolation suite: add `<Model>Factory` for every new `TenantOwnedModel` in
+      each app's `tests/factories.py` (the suite auto-discovers from there — see G-06)
+- [ ] Extend `Membership` with the deferred `stores` M2M to `inventory.Location` (X-06)
+
+Phases 3–12 checklists get expanded when each phase starts. Do not pre-expand them —
 they go stale and cost tokens to read.
 
 ---
@@ -224,8 +251,11 @@ Newest first. Keep entries to three lines. Detail belongs in `MEMORY.md`.
   5 territory. 19/19 tests green, ruff clean, no pending migrations.
 - Smoke-tested the full login → middleware → org-switcher flow via curl as a demo user;
   confirmed org resolution and template rendering work end-to-end.
-- Next: run `/next-phase` to gate Phase 1 closed (needs a user-run cold-start check) and
-  open Phase 2.
+- `/next-phase`: user ran the cold-start check manually again (G-05 applies every phase, not
+  just Phase 0). Full gate green on the fresh volume — migrations, 19/19 tests, isolation
+  subset, ruff, `seed_demo`. CLAUDE.md §7 DoD walked, no gaps. **Phase 1 closed.**
+- Phase 2 (catalogue & inventory models) opened, checklist expanded. No blockers.
+- Next: `apps/catalog/` models.
 
 ### 2026-XX-XX — Session 0 (setup)
 - Audited the original repo; produced `ANALYSIS.md`

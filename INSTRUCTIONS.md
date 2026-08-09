@@ -160,8 +160,8 @@ Files:    PROGRESS.md, MEMORY.md, <context files> updated ✓
 
 ```
 Last updated:     Session 1 (2026-08-09)
-Phase:            1 — Tenancy foundation
-Status:           IN PROGRESS — all 9 tasks built & tested, not yet gated via /next-phase
+Phase:            2 — Catalogue & inventory models
+Status:           IN PROGRESS (not yet started coding; Phase 0 and Phase 1 both DONE)
 Apps existing:    apps.core (scoping machinery, forms, factories, /healthz/),
                   apps.tenancy (Organization, Department, User, Membership, middleware,
                   decorators, org switcher, seed_demo/create_trust_admin)
@@ -171,10 +171,10 @@ Migrations:       tenancy 0001_initial, 0002_seed_organizations (7 SRMS orgs fro
                   + django built-ins + django_celery_beat
 Tests:            19 passing — core/tests/test_healthz.py (1),
                   tenancy/tests/test_isolation.py (7), tenancy/tests/test_decorators.py (11)
-Docker:           up and healthy. DB was dropped/recreated via psql this session for the
-                  AUTH_USER_MODEL swap (D-13) — approved, narrower than docker compose down -v
+Docker:           up and healthy, cold-start verified twice this session (Phase 0 and
+                  Phase 1 gates — user-run each time, see G-05)
 Celery:           wired (config/celery.py), not yet exercised
-Next action:      run /next-phase to gate Phase 1 closed (needs a user-run cold-start check,
-                  same as Phase 0 — see G-05) and open Phase 2
+Next action:      apps/catalog/ models — Category, Item (no quantity field, ever — D-05),
+                  UnitOfMeasure, Supplier, ItemSupplier
 Open blockers:    none for Phase 2. Q4-Q8 still open, needed before Phase 5.
 ```
