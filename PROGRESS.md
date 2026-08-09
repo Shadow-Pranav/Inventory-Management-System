@@ -14,7 +14,7 @@
 | **Phase status** | `IN PROGRESS` — one item left (see below) |
 | **Next action** | Run the cold-start check (`docker compose down -v && docker compose up --build`, needs explicit confirmation — destroys the dev volumes), then Phase 0 is done and Phase 1 (tenancy foundation) can start. |
 | **Blockers** | None for finishing Phase 0. Q1–Q3 (org names, store structure, approval thresholds) are open; answer before Phase 1 starts. |
-| **Branch** | `main` (git initialised this session, nothing committed yet) |
+| **Branch** | `main` — 2 commits (`824a109` scaffold, `2a35217` entrypoint.sh exec-bit fix) |
 
 ---
 
@@ -45,7 +45,8 @@
 - [x] `git init` (no commit yet — commits are made only when you ask)
 - [x] `pyproject.toml` + `uv.lock`
 - [x] `docker/web/Dockerfile` (multi-stage; venv at `/opt/venv`, see G-01/G-02 in `MEMORY.md`)
-- [x] `docker/entrypoint.sh` (executable bit set, LF endings)
+- [x] `docker/entrypoint.sh` (executable bit set, LF endings — had to be fixed in a follow-up
+      commit; `core.fileMode=false` on this checkout ate the bit on first commit, see G-04)
 - [x] `compose.yaml` with profiles
 - [x] `docker/nginx/default.conf`
 - [x] `.dockerignore`, `.gitattributes`
@@ -150,11 +151,12 @@ Newest first. Keep entries to three lines. Detail belongs in `MEMORY.md`.
 - `git init`; scaffolded the entire Phase 0 stack by hand (no host Python for
   `django-admin startproject`): `pyproject.toml`/`uv.lock`, Docker files, `compose.yaml`,
   settings split, `config/celery.py`, `apps/core` with `/healthz/`.
-- Hit and fixed two real bugs in the reference Dockerfile/compose from context 03 — see
-  G-01, G-02 in `MEMORY.md` (venv shadowed by the dev bind-mount; named volumes seeded
-  root-owned). Context 03 updated to match.
+- Hit and fixed three real bugs in the reference Dockerfile/compose from context 03 — see
+  G-01 through G-04 in `MEMORY.md` (venv shadowed by the dev bind-mount; named volumes
+  seeded root-owned; entrypoint.sh exec bit lost on commit). Context 03 updated to match.
 - Stack is up and healthy: `/healthz/` → 200, admin loads, superuser `admin` created,
-  `pytest`/`ruff`/`makemigrations --check` all clean.
+  `pytest`/`ruff`/`makemigrations --check` all clean. Committed in 2 commits (824a109,
+  2a35217).
 - Cold-start check (`down -v && up --build`) not yet run — attempted, tool call was denied.
 - Next: get the cold-start check approved and run, then close Phase 0 and start Phase 1
   (after Q1–Q3 are answered).

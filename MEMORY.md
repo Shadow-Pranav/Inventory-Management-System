@@ -188,6 +188,23 @@ volume that already exists.
 which bundles both `uv` and Python. Only needed for bootstrapping/regenerating the lockfile
 outside the app image; the app `Dockerfile` correctly uses `uv:latest` as a copy source.
 
+### G-04 · `git add`/commit silently dropped `entrypoint.sh`'s executable bit
+**Phase:** 0 · **Date:** 2026-08-09
+**Symptom:** `chmod +x docker/entrypoint.sh` was run and confirmed locally (`ls -la` showed
+`-rwxr-xr-x`), but after `git add -A && git commit`, `git ls-files -s` showed mode `100644`
+(non-executable) for the file — exactly the F-07 failure mode this repo was warned about.
+**Cause:** `core.fileMode` is `false` on this Windows checkout (Git for Windows' usual
+default, since NTFS doesn't natively track the Unix executable bit the way git wants). With
+it `false`, git ignores the filesystem's executable bit entirely when diffing/staging, so a
+host-level `chmod` never reaches the index.
+**Fix:** `git update-index --chmod=+x docker/entrypoint.sh` sets the mode bit directly in
+git's index regardless of `core.fileMode`, then commit normally.
+**Watch for:** any new script that needs to be executable inside the container (future
+management commands invoked directly, other entrypoints) needs the same
+`git update-index --chmod=+x` treatment on this machine — a plain `chmod` will not survive
+the next commit. Worth checking with `git ls-files -s <path>` (look for `100755`) after
+adding any new `*.sh` file, not just trusting the local filesystem.
+
 Template:
 
 ```
