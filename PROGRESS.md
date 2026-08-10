@@ -162,8 +162,24 @@ All 6 tasks complete, phase gate passed 2026-08-10.
 - [x] `AUDITOR` write-blocking: `require_role(..., write=True)` rejects auditors regardless of
       role list — already true of the decorator since Phase 1 (G-07); confirmed end-to-end by
       `test_permission_matrix_auditor_forbidden_on_every_write_view` above, not just unit-tested
-- [ ] Org Admin UI: invite/create users, assign roles, manage departments, deactivate
-      memberships, view the org's audit log
+- [x] Org Admin UI: `apps/tenancy/views.py` — `member_list`/`member_invite`/`member_update`
+      (role + department + `is_active` in one form — no separate "deactivate" endpoint),
+      `department_list`/`create`/`update`, `audit_log_list` (`ORG_ADMIN` + `AUDITOR`, per the
+      role table — auditors read logs too). New `apps/tenancy/forms.py`
+      (`MembershipInviteForm`, `MembershipRoleForm`, `DepartmentForm`) and
+      `apps/tenancy/emails.py::send_password_setup_email` — **not** Django's built-in
+      `PasswordResetForm`, which silently skips any user without a usable password
+      (`get_users()` filters on `has_usable_password()`); a freshly invited user always has
+      one, by design, so that form would drop every invite email. Built the same
+      token/uid/link by hand instead. Full `registration/password_reset_*` template set
+      added since the invite flow depends on it (`registration/password_reset_confirm.html`,
+      `_complete.html`, `_email.html`, `_subject.txt`, plus `_form.html`/`_done.html` for
+      the self-service "forgot password" entry point Task 6 needs). 12 new tests in
+      `apps/tenancy/tests/test_org_admin_views.py`. **Deferred, flagged in code and
+      `MEMORY.md`:** `Membership` isn't a `TenantOwnedModel` (predates it, different
+      `on_delete` semantics) so it has no `.for_request()`/`get_tenant_object()` — scoped by
+      hand in a `_membership_queryset()` helper instead, same pattern `switch_organization`
+      already used. 113/113 tests green
 - [ ] Trust Admin UI: organisation CRUD, assign first Org Admin, org switcher, cross-org user
       search
 - [x] `apps/core/audit.py` — `pre_save`/`post_save`/`post_delete` receivers connected from
@@ -200,7 +216,9 @@ manage.py, pyproject.toml, uv.lock, compose.yaml, Makefile, README.md
 docker/web/Dockerfile, docker/entrypoint.sh, docker/nginx/default.conf
 config/{__init__,celery,urls,wsgi,asgi}.py
 config/settings/{__init__,base,dev,prod,test}.py
-templates/base.html, templates/registration/login.html, templates/partials/navbar.html
+templates/base.html, templates/partials/navbar.html
+templates/registration/login.html, password_reset_{form,done,confirm,complete,email}.html,
+  password_reset_subject.txt
 
 apps/__init__.py
 apps/core/{__init__,apps,models,views,urls,admin,audit}.py
@@ -208,12 +226,13 @@ apps/core/{managers,context,exceptions,forms,factories,context_processors}.py
 apps/core/migrations/{__init__,0001_initial}.py
 apps/core/tests/{__init__,test_healthz,factories,test_audit}.py
 
-apps/tenancy/{__init__,apps,models,admin,middleware,decorators,views,urls,context_processors}.py
+apps/tenancy/{__init__,apps,models,admin,middleware,decorators,views,urls,forms,emails,context_processors}.py
 apps/tenancy/migrations/{__init__,0001_initial,0002_seed_organizations,0003_membership_stores}.py
 apps/tenancy/fixtures/organizations.json
 apps/tenancy/management/commands/{seed_demo,create_trust_admin}.py
-apps/tenancy/tests/{__init__,factories,test_isolation,test_decorators,test_permission_matrix}.py
-apps/tenancy/templates/tenancy/{no_access,switch_organization}.html
+apps/tenancy/tests/{__init__,factories,test_isolation,test_decorators,test_permission_matrix,test_org_admin_views}.py
+apps/tenancy/templates/tenancy/{no_access,switch_organization,member_list,member_form,
+  member_role_form,department_list,department_form,audit_log_list}.html
 
 apps/catalog/{__init__,apps,models,admin,forms,views,urls}.py
 apps/catalog/migrations/{__init__,0001_initial}.py
@@ -244,6 +263,7 @@ scanning the repo.
 | tenancy isolation (`test_isolation.py`) | 7 | 7 | `Department` (`AuditLog` covered in core instead — see `MEMORY.md` D-16) |
 | tenancy access control (`test_decorators.py`) | 11 | 11 | `require_org_context`, `require_role`, `require_trust_admin`, `get_tenant_object` |
 | tenancy permission matrix (`test_permission_matrix.py`) | 6 | 6 | 10 views × 4 roles + trust-admin bypass + auditor-forbidden, through real URLs |
+| tenancy org admin UI (`test_org_admin_views.py`) | 12 | 12 | invite (+ email sent, + duplicate rejection), role/dept/active update, department CRUD, audit log (org-scoped, auditor-visible, non-admin-forbidden) |
 | catalog | 28 | 28 | Isolation ×5 models (20), `TenantModelForm` regression (G-09) ×3, views ×5 |
 | inventory | 29 | 29 | Isolation ×5 models (20), `apply_movement()` ×6 (incl. concurrency), views ×3 |
 | procurement | 0 | — | Phase 5 |
@@ -251,7 +271,7 @@ scanning the repo.
 | assets | 0 | — | Phase 7 |
 | intelligence | 0 | — | Phase 8 |
 | alerts | 0 | — | Phase 9 |
-| **Total** | **101** | **101** | — |
+| **Total** | **113** | **113** | — |
 
 No baseline to carry over — greenfield build, see D-11 in `MEMORY.md`.
 

@@ -202,6 +202,37 @@ side-effect-free for the model under test" assumption specifically when the mode
 is `AuditLog`. Covered directly instead in `apps/core/tests/test_audit.py` (create/update/
 delete/no-op/trust-scope/org-scoping/append-only — 9 tests).
 
+### D-17 · Phase 3 Org Admin UI implementation decisions
+**Date:** Session 2 (2026-08-10) · **Status:** Active
+**Django's `PasswordResetForm` can't be reused for invites.** `member_invite` creates a new
+`User` with `set_unusable_password()` and needs to email them a "set your password" link.
+Django's built-in `PasswordResetForm.save()` internally calls `get_users()`, which filters
+candidates to `has_usable_password()` — deliberately, for the *self-service* "forgot
+password" flow (no point emailing a reset link to an account that was never given a
+password in the first place, under Django's own framing). For an admin-driven invite that
+framing is backwards: the whole point is the new user has no password yet. Wrote
+`apps/tenancy/emails.py::send_password_setup_email()` to build the same token/uid/link
+`PasswordResetConfirmView` expects, by hand, bypassing the `has_usable_password()` gate.
+The self-service flow (`/accounts/password_reset/`) still goes through Django's stock view
+and form — that gate is correct there.
+**`Membership` is not a `TenantOwnedModel`.** It links a cross-org `User` to one
+`Organization` and predates `TenantOwnedModel` (Phase 1). It has no `TenantManager`, no
+`.for_request()`, no `get_tenant_object()` support — `apps/tenancy/views.py::
+_membership_queryset()` scopes it by hand (mirroring the pattern `switch_organization`
+already used since Phase 1), and the generic auto-discovering isolation suite in
+`test_isolation.py` has never covered it (only `TenantOwnedModel` subclasses are
+auto-discovered). This was surfaced, not created, by Phase 3 — the Org Admin UI is the
+first code to need object-level Membership lookups. **Deliberately not changed this
+phase:** `Membership.organization` uses `on_delete=CASCADE` (correct — a membership is
+meaningless once its org is gone), while `TenantOwnedModel.organization` uses
+`on_delete=PROTECT` (also correct, for masters/transactions that should block org deletion
+until manually cleared). Making `Membership` inherit `TenantOwnedModel` would need to
+override that default, plus a migration, plus re-verifying no G-07-style manager-override
+gotcha reappears — real work, not a drive-by fix mid-Org-Admin-UI-slice. Tracked as X-09
+below; revisit if a second view needs the same manual-scoping pattern, or if audit/isolation
+tooling written against "every tenant-owned model is a `TenantOwnedModel`" starts assuming
+it and gets it wrong for `Membership`.
+
 ### D-10 · Compliance registers are per-organisation
 **Why:** A hospital's biomedical-waste obligations and a hotel-management college's FSSAI
 licensing have nothing in common. A Trust-wide fixed register would be wrong for every
@@ -451,6 +482,7 @@ Things deliberately not decided yet, so nobody assumes they were overlooked.
 | X-05 | Data retention for `StockMovement` and `AuditLog` | No regulatory input yet | Phase 12 |
 | X-07 | Is Riddhima's `org_type` really `VENTURE`? Guessed, not confirmed (see D-13) | Not load-bearing yet | Before Phase 7 (compliance templates key off `org_type`) |
 | X-08 | `IssueRequest.issue_number` — per-org-per-FY sequence generator | Belongs with the rest of the doc-numbering convention (context 04 §3), not built ahead of it | Phase 5 |
+| X-09 | Should `Membership` inherit `TenantOwnedModel` (currently `TimeStampedModel` + explicit `organization` FK) for `.for_request()`/`get_tenant_object()`/isolation-suite coverage? | Needs an `on_delete` override (CASCADE, not TenantOwnedModel's PROTECT) + migration + re-verifying manager overrides — not a drive-by fix; see D-17 | If a second view needs the same manual `_membership_queryset()`-style scoping |
 
 **Resolved:** X-06 (`Membership.stores` M2M) — done in Phase 2, see D-14.
 

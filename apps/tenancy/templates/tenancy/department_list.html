@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Departments{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="h4 mb-0">Departments</h1>
+    <a class="btn btn-primary btn-sm" href="{% url 'tenancy:department_create' %}">New department</a>
+</div>
+<table class="table table-sm">
+    <thead><tr><th>Name</th><th>Code</th><th>Parent</th><th></th></tr></thead>
+    <tbody>
+        {% for department in departments %}
+        <tr>
+            <td>{{ department.name }}</td>
+            <td>{{ department.code }}</td>
+            <td>{{ department.parent|default:"—" }}</td>
+            <td><a href="{% url 'tenancy:department_update' department.pk %}">Edit</a></td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="4" class="text-muted">No departments yet.</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}
