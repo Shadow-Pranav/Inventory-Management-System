@@ -421,6 +421,22 @@ Things deliberately not decided yet, so nobody assumes they were overlooked.
 
 **Resolved:** X-06 (`Membership.stores` M2M) — done in Phase 2, see D-14.
 
+### D-15 · Phase 2 gate closed on a genuine cold start
+**Date:** Session 2 (2026-08-10) · **Status:** Active
+**Decision:** Phase 2 gated `DONE` after the full `CLAUDE.md` §7 Definition of Done was
+walked against a *fresh* volume, not just the already-running stack. Docker Desktop was down
+at session start (not running at all, not just the compose stack) — started it, then
+`docker compose up -d --build`, confirmed `/healthz/` → 200. Ran the non-destructive gate
+checks (migrations/tests/isolation/ruff/seed_demo) on that stack first — all green — then the
+user ran `docker compose down -v && docker compose up --build -d` themselves (G-05: still
+hard-denied for Claude) and confirmed success; re-ran the identical checks against the fresh
+volume — same result, 86/86 tests, 55/55 isolation. Also grepped `apps/` for stray
+`.objects.all()` outside the tenancy layer per the DoD's explicit item — the only hit is
+`test_isolation.py`'s own assertion that it *raises* `UnscopedQueryError`, not a leak.
+**Why recorded:** the previous two phase gates (D-13/G-05 notes) didn't spell out re-running
+the full check suite twice (once live, once post-cold-start) — worth being explicit that
+"the gate passed" means both, not just the cold-start boot succeeding.
+
 ---
 
 ## Section E — User preferences & context

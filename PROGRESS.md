@@ -9,12 +9,12 @@
 
 | | |
 |---|---|
-| **Last session** | Session 1 (2026-08-09) — Phase 2 all 6 tasks built and passing: catalog/inventory/issuance models, `apply_movement()`, `Membership.stores`, views/forms/templates |
-| **Current phase** | Phase 2 — Catalogue & inventory models |
-| **Phase status** | `IN PROGRESS` — all tasks complete, acceptance criteria met; **not yet gated** (no `/next-phase` cold-start run this slice) |
-| **Next action** | Run `/next-phase` to gate Phase 2 closed (needs a user-run cold-start check — G-05) and open Phase 3. |
+| **Last session** | Session 2 (2026-08-10) — Phase 2 gated closed (cold-start + full gate green, user-run down -v); Phase 3 opened |
+| **Current phase** | Phase 3 — Access control & org administration |
+| **Phase status** | `IN PROGRESS` — checklist expanded, no code yet |
+| **Next action** | Start Task 1: `require_role` applied to every existing view + permission-matrix test fixture |
 | **Blockers** | None. Q4–Q8 still open, needed before Phase 5. |
-| **Branch** | `main` — 8 commits (`824a109` … `7716888` Phase 2); tree clean |
+| **Branch** | `main` — 8 commits (`824a109` … `7716888`); tree clean, Phase 2 gate commit pending this session |
 
 ---
 
@@ -24,8 +24,8 @@
 |---|---|---|---|---|---|
 | 0 | Bootstrap the project | `DONE` | 2026-08-09 | 2026-08-09 | Greenfield (D-11); cold-start verified |
 | 1 | Tenancy foundation | `DONE` | 2026-08-09 | 2026-08-09 | Gate passed cold-start, 19/19 tests, DoD walked |
-| 2 | Catalogue & inventory models | `IN PROGRESS` | 2026-08-09 | — | All 6 tasks built & tested; awaiting `/next-phase` gate |
-| 3 | Access control & org admin | `NOT STARTED` | — | — | Drop `Item.quantity` at the end |
+| 2 | Catalogue & inventory models | `DONE` | 2026-08-09 | 2026-08-10 | Gate passed cold-start (user-run), 86/86 tests, isolation 55/55, ruff clean |
+| 3 | Access control & org admin | `IN PROGRESS` | 2026-08-10 | — | Stale note removed: `Item.quantity` never existed (D-05/D-11, greenfield) — nothing to drop |
 | 4 | Master data & catalogue | `NOT STARTED` | — | — | |
 | 5 | Procurement (Req→PO→GRN) | `NOT STARTED` | — | — | |
 | 6 | Issuance, returns, transfers | `NOT STARTED` | — | — | |
@@ -36,7 +36,7 @@
 | 11 | API & integrations | `NOT STARTED` | — | — | Optional for v1 |
 | 12 | Hardening & deployment | `NOT STARTED` | — | — | |
 
-**Overall: 2 / 13 phases complete.**
+**Overall: 3 / 13 phases complete.**
 
 ---
 
@@ -107,9 +107,11 @@
 
 </details>
 
-## Phase 2 — task checklist (IN PROGRESS, started 2026-08-09)
+## Phase 2 — task checklist (DONE, 2026-08-10)
 
-All 6 tasks complete; phase gate (`/next-phase`) not yet run this slice.
+<details><summary>All 6 tasks complete, gate passed — expand for the record</summary>
+
+All 6 tasks complete, phase gate passed 2026-08-10.
 
 - [x] `apps/catalog/`: `Category`, `Item` (no `quantity`), `UnitOfMeasure`, `Supplier`
       (+ `blacklist_reason`, not in the original spec but paired with `is_blacklisted`),
@@ -139,9 +141,37 @@ All 6 tasks complete; phase gate (`/next-phase`) not yet run this slice.
       (X-06 closed, D-14)
 - [x] Isolation suite auto-extended: 5 catalog + 5 inventory + 2 issuance models × 4 checks
       = 55 isolation assertions, all via `<Model>Factory` per app (G-06's convention)
+- [x] Phase gate: cold-start (`down -v && up --build`, user-run — G-05), `makemigrations
+      --check` (no changes), `pytest` (86/86), `pytest -k isolation` (55/55), `ruff
+      check`/`format --check` clean, `seed_demo` clean — all re-run against the fresh volume,
+      not just the pre-existing one. CLAUDE.md §7 DoD walked item by item, no gaps (including
+      a grep for stray `.objects.all()` outside the tenancy layer — the one hit is
+      `test_isolation.py`'s own assertion that it *raises*, not a leak).
 
-Phase 3 checklist gets expanded when it starts, after `/next-phase` gates Phase 2 closed. Do
-not pre-expand — checklists go stale and cost tokens to read.
+</details>
+
+## Phase 3 — task checklist (IN PROGRESS, started 2026-08-10)
+
+- [ ] `require_role` applied to every existing view (catalog, inventory, issuance); permission
+      matrix (role × view × read/write) built as a test fixture so the matrix *is* the test
+- [ ] `AUDITOR` write-blocking: `require_role(..., write=True)` rejects auditors regardless of
+      role list
+- [ ] Org Admin UI: invite/create users, assign roles, manage departments, deactivate
+      memberships, view the org's audit log
+- [ ] Trust Admin UI: organisation CRUD, assign first Org Admin, org switcher, cross-org user
+      search
+- [ ] `apps/core/audit.py` — post-save/post-delete receivers writing `AuditLog` for every model
+      in `settings.AUDITED_MODELS`; field-level diffs; trust-admin cross-org writes marked
+      `actor_scope="TRUST"`
+- [ ] Password reset via email (Mailhog in dev), `django-axes` login rate limiting, session
+      expiry, forced password change on first login for seeded accounts
+- [ ] Navbar/sidebar renders only permitted links (UX only — decorator remains the actual
+      security boundary)
+
+**Acceptance:** permission matrix test passes for all 5 roles × all views; Org Admin of
+Nursing gets 404 (not 403) on a CET item URL; auditor gets 403 on every POST/PUT/DELETE;
+audit log records who changed what, from what, to what; a trust admin editing IMS data
+produces a row visible to the IMS Org Admin.
 
 ---
 
@@ -241,6 +271,18 @@ Q1–Q3 answered — Phase 1 unblocked. Q4–Q8 can wait but should be resolved 
 ## Session log
 
 Newest first. Keep entries to three lines. Detail belongs in `MEMORY.md`.
+
+### 2026-08-10 — Session 2
+- Docker Desktop wasn't running at session start; started it, brought the stack up (`docker
+  compose up -d --build`), confirmed `/healthz/` → 200.
+- Ran the Phase 2 gate on the live stack (migrations/tests/isolation/ruff/seed_demo, all
+  green), then the user ran the cold-start check (`down -v && up --build`, G-05) themselves
+  and confirmed it worked; re-ran the full gate against the fresh volume — still 86/86 tests,
+  55/55 isolation, ruff clean. **Phase 2 closed.**
+- Fixed a stale Phase 3 board note ("Drop `Item.quantity` at the end") — that field never
+  existed per D-05/D-11 (greenfield); nothing to drop.
+- Phase 3 (access control & org admin) opened, checklist expanded from `PROMPTS.md`. No
+  blockers; Q4–Q8 still open but don't block this phase.
 
 ### 2026-08-09 — Session 1
 - Found no original-repo clone in the directory (planning bundle only, not a git repo) —
