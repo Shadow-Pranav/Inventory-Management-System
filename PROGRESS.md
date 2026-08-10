@@ -14,7 +14,7 @@
 | **Phase status** | `IN PROGRESS` — checklist expanded, no code yet |
 | **Next action** | Start Task 1: `require_role` applied to every existing view + permission-matrix test fixture |
 | **Blockers** | None. Q4–Q8 still open, needed before Phase 5. |
-| **Branch** | `main` — 8 commits (`824a109` … `7716888`); tree clean, Phase 2 gate commit pending this session |
+| **Branch** | `main` — 9 commits (`824a109` … `88f29cc` Phase 2 gate close); tree clean, 86/86 tests passing |
 
 ---
 
