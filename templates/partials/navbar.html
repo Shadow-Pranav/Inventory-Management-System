@@ -2,6 +2,34 @@
     <div class="container-fluid">
         <a class="navbar-brand" href="/">SITS</a>
         {% if user.is_authenticated %}
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
+                data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false"
+                aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <!-- Links are UX only — the require_role/require_org_context decorator on each
+                 view is the actual security boundary (context 04 §7). A link hidden here
+                 that someone reaches by URL still gets the same 403/404 as everyone else. -->
+            <ul class="navbar-nav me-auto">
+                {% if request.organization or request.is_trust_scope %}
+                <li class="nav-item"><a class="nav-link" href="{% url 'catalog:item_list' %}">Items</a></li>
+                <li class="nav-item"><a class="nav-link" href="{% url 'catalog:category_list' %}">Categories</a></li>
+                <li class="nav-item"><a class="nav-link" href="{% url 'inventory:stock_level_list' %}">Stock</a></li>
+                <li class="nav-item"><a class="nav-link" href="{% url 'issuance:issue_request_list' %}">Issue requests</a></li>
+                {% endif %}
+                {% if user.is_trust_admin or request.membership.role == "ORG_ADMIN" %}
+                <li class="nav-item"><a class="nav-link" href="{% url 'tenancy:member_list' %}">Members</a></li>
+                <li class="nav-item"><a class="nav-link" href="{% url 'tenancy:department_list' %}">Departments</a></li>
+                {% endif %}
+                {% if user.is_trust_admin or request.membership.role == "ORG_ADMIN" or request.membership.role == "AUDITOR" %}
+                <li class="nav-item"><a class="nav-link" href="{% url 'tenancy:audit_log_list' %}">Audit log</a></li>
+                {% endif %}
+                {% if user.is_trust_admin %}
+                <li class="nav-item"><a class="nav-link" href="{% url 'tenancy:org_list' %}">Organisations</a></li>
+                <li class="nav-item"><a class="nav-link" href="{% url 'tenancy:user_search' %}">User search</a></li>
+                {% endif %}
+            </ul>
         <div class="d-flex align-items-center ms-auto gap-3">
             {% if user.is_trust_admin or user.memberships.count > 1 %}
             <div class="dropdown">
@@ -42,6 +70,7 @@
                 {% csrf_token %}
                 <button class="btn btn-outline-light btn-sm" type="submit">Log out</button>
             </form>
+        </div>
         </div>
         {% endif %}
     </div>

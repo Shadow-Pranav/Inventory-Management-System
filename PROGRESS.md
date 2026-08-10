@@ -221,8 +221,15 @@ All 6 tasks complete, phase gate passed 2026-08-10.
       `password_change` by being registered first in `config/urls.py` — same name, same
       path, first match wins on dispatch). 6 new tests in `test_security.py`, including one
       that a locked-out account doesn't take its shared IP down with it. 126/126 tests green
-- [ ] Navbar/sidebar renders only permitted links (UX only — decorator remains the actual
-      security boundary)
+- [x] Navbar/sidebar renders only permitted links. Also closed a pre-existing gap noticed
+      while wiring it: the navbar had **zero** feature links through Phases 1–2 (only the
+      org switcher + logout) — catalog/inventory/issuance were only reachable by typing a
+      URL. Added Items/Categories/Stock/Issue requests (any org-scoped role),
+      Members/Departments (`ORG_ADMIN`), Audit log (`ORG_ADMIN` + `AUDITOR`),
+      Organisations/User search (trust admin). Explicitly UX only — `templates/partials/
+      navbar.html` has a comment pointing back at the real boundary (the view decorator);
+      a hidden-vs-shown link changes nothing about what a direct URL hit returns. 4 new
+      tests in `test_navbar.py` per role. 130/130 tests green
 
 **Acceptance:** permission matrix test passes for all 5 roles × all views; Org Admin of
 Nursing gets 404 (not 403) on a CET item URL; auditor gets 403 on every POST/PUT/DELETE;
@@ -254,7 +261,7 @@ apps/tenancy/migrations/{__init__,0001_initial,0002_seed_organizations,0003_memb
 apps/tenancy/fixtures/organizations.json
 apps/tenancy/management/commands/{seed_demo,create_trust_admin}.py
 apps/tenancy/tests/{__init__,factories,test_isolation,test_decorators,test_permission_matrix,
-  test_org_admin_views,test_trust_admin_views,test_security}.py
+  test_org_admin_views,test_trust_admin_views,test_security,test_navbar}.py
 apps/tenancy/templates/tenancy/{no_access,switch_organization,member_list,member_form,
   member_role_form,department_list,department_form,audit_log_list,org_list,org_form,
   user_search}.html
@@ -291,6 +298,7 @@ scanning the repo.
 | tenancy org admin UI (`test_org_admin_views.py`) | 12 | 12 | invite (+ email sent, + duplicate rejection), role/dept/active update, department CRUD, audit log (org-scoped, auditor-visible, non-admin-forbidden) |
 | tenancy trust admin UI (`test_trust_admin_views.py`) | 7 | 7 | org CRUD, create→invite-first-admin round trip, cross-org user search, non-trust-admin-forbidden |
 | tenancy security (`test_security.py`) | 6 | 6 | axes lockout (+ scoped to username+IP pair, not the whole IP), forced password change redirect/clear/logout-exempt |
+| tenancy navbar (`test_navbar.py`) | 4 | 4 | link visibility per role: dept staff, org admin, auditor, unpinned trust admin |
 | catalog | 28 | 28 | Isolation ×5 models (20), `TenantModelForm` regression (G-09) ×3, views ×5 |
 | inventory | 29 | 29 | Isolation ×5 models (20), `apply_movement()` ×6 (incl. concurrency), views ×3 |
 | procurement | 0 | — | Phase 5 |
@@ -298,7 +306,7 @@ scanning the repo.
 | assets | 0 | — | Phase 7 |
 | intelligence | 0 | — | Phase 8 |
 | alerts | 0 | — | Phase 9 |
-| **Total** | **126** | **126** | — |
+| **Total** | **130** | **130** | — |
 
 No baseline to carry over — greenfield build, see D-11 in `MEMORY.md`.
 
