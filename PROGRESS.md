@@ -166,9 +166,20 @@ All 6 tasks complete, phase gate passed 2026-08-10.
       memberships, view the org's audit log
 - [ ] Trust Admin UI: organisation CRUD, assign first Org Admin, org switcher, cross-org user
       search
-- [ ] `apps/core/audit.py` — post-save/post-delete receivers writing `AuditLog` for every model
-      in `settings.AUDITED_MODELS`; field-level diffs; trust-admin cross-org writes marked
-      `actor_scope="TRUST"`
+- [x] `apps/core/audit.py` — `pre_save`/`post_save`/`post_delete` receivers connected from
+      `CoreConfig.ready()` for every model in `settings.AUDITED_MODELS` (currently
+      `Organization`, `Department`, `Membership`, `Item`, `Category`, `Supplier`).
+      `AuditLog` (new `apps/core` model, append-only like `StockMovement`) records
+      field-level diffs (`{field: [old, new]}` for CREATE/UPDATE, last-known state for
+      DELETE); actor and `actor_scope` come from new context-var plumbing
+      (`apps/core/context.py::set_current_actor`, set by `OrganizationMiddleware`) since
+      signals have no `request`. `Organization` itself is audited against its own row
+      (no separate org to attribute a creation to). M2M fields (`Membership.stores`) are
+      **not** captured — `post_save`/`pre_save` don't see `m2m_changed`; deferred, see
+      `MEMORY.md`. 9 new tests in `apps/core/tests/test_audit.py`; `AuditLog` excluded from
+      the generic isolation suite with an explained reason (auditing `Organization` itself
+      breaks that suite's "factory calls are side-effect-free for other models" assumption)
+      — its own isolation is asserted directly instead. 101/101 tests green
 - [ ] Password reset via email (Mailhog in dev), `django-axes` login rate limiting, session
       expiry, forced password change on first login for seeded accounts
 - [ ] Navbar/sidebar renders only permitted links (UX only — decorator remains the actual
@@ -192,16 +203,16 @@ config/settings/{__init__,base,dev,prod,test}.py
 templates/base.html, templates/registration/login.html, templates/partials/navbar.html
 
 apps/__init__.py
-apps/core/{__init__,apps,models,views,urls}.py
+apps/core/{__init__,apps,models,views,urls,admin,audit}.py
 apps/core/{managers,context,exceptions,forms,factories,context_processors}.py
-apps/core/migrations/__init__.py
-apps/core/tests/{__init__,test_healthz}.py
+apps/core/migrations/{__init__,0001_initial}.py
+apps/core/tests/{__init__,test_healthz,factories,test_audit}.py
 
 apps/tenancy/{__init__,apps,models,admin,middleware,decorators,views,urls,context_processors}.py
 apps/tenancy/migrations/{__init__,0001_initial,0002_seed_organizations,0003_membership_stores}.py
 apps/tenancy/fixtures/organizations.json
 apps/tenancy/management/commands/{seed_demo,create_trust_admin}.py
-apps/tenancy/tests/{__init__,factories,test_isolation,test_decorators}.py
+apps/tenancy/tests/{__init__,factories,test_isolation,test_decorators,test_permission_matrix}.py
 apps/tenancy/templates/tenancy/{no_access,switch_organization}.html
 
 apps/catalog/{__init__,apps,models,admin,forms,views,urls}.py
@@ -229,9 +240,10 @@ scanning the repo.
 
 | Suite | Tests | Passing | Coverage |
 |---|---|---|---|
-| core (`/healthz/`) | 1 | 1 | — |
-| tenancy isolation (`test_isolation.py`) | 7 | 7 | `Department` |
+| core (`/healthz/`, `test_audit.py`) | 10 | 10 | `AuditLog` create/update/delete/no-op/trust-scope/org-scoping/append-only |
+| tenancy isolation (`test_isolation.py`) | 7 | 7 | `Department` (`AuditLog` covered in core instead — see `MEMORY.md` D-16) |
 | tenancy access control (`test_decorators.py`) | 11 | 11 | `require_org_context`, `require_role`, `require_trust_admin`, `get_tenant_object` |
+| tenancy permission matrix (`test_permission_matrix.py`) | 6 | 6 | 10 views × 4 roles + trust-admin bypass + auditor-forbidden, through real URLs |
 | catalog | 28 | 28 | Isolation ×5 models (20), `TenantModelForm` regression (G-09) ×3, views ×5 |
 | inventory | 29 | 29 | Isolation ×5 models (20), `apply_movement()` ×6 (incl. concurrency), views ×3 |
 | procurement | 0 | — | Phase 5 |
@@ -239,7 +251,7 @@ scanning the repo.
 | assets | 0 | — | Phase 7 |
 | intelligence | 0 | — | Phase 8 |
 | alerts | 0 | — | Phase 9 |
-| **Total** | **86** | **86** | — |
+| **Total** | **101** | **101** | — |
 
 No baseline to carry over — greenfield build, see D-11 in `MEMORY.md`.
 

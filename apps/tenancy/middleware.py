@@ -1,4 +1,9 @@
-from apps.core.context import clear_current_organization, set_current_organization
+from apps.core.context import (
+    clear_current_actor,
+    clear_current_organization,
+    set_current_actor,
+    set_current_organization,
+)
 
 from .models import Membership, Organization
 
@@ -31,10 +36,18 @@ class OrganizationMiddleware:
                     request.organization = membership.organization
 
         set_current_organization(request.organization)
+        # actor_scope="TRUST" marks every write a trust admin makes, in or out of a pinned
+        # org — apps/core/audit.py's receivers use it per context 02 §4 ("every trust-admin
+        # write against another org's data writes an AuditLog row with actor_scope=TRUST").
+        set_current_actor(
+            request.user if request.user.is_authenticated else None,
+            "TRUST" if getattr(request.user, "is_trust_admin", False) else "ORG",
+        )
         try:
             return self.get_response(request)
         finally:
             clear_current_organization()
+            clear_current_actor()
 
     def _resolve_membership(self, request):
         base_qs = Membership.objects.select_related("organization", "department").filter(

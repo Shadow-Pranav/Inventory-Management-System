@@ -30,11 +30,22 @@ from apps.tenancy.tests.factories import MembershipFactory, OrganizationFactory,
 User = get_user_model()
 
 
+# AuditLog is deliberately excluded from this generic suite: apps/core/audit.py audits
+# `tenancy.Organization` itself, so the `OrganizationFactory()` calls every test below makes
+# for org_a/org_b are *not* side-effect-free for AuditLog the way they are for every other
+# model — each one writes its own "Organization created" row. That breaks the "make() adds
+# exactly one row" assumption these four tests share. AuditLog's own isolation (and the
+# audit-writing behaviour itself) is covered directly in apps/core/tests/test_audit.py.
+EXCLUDED_FROM_GENERIC_SUITE = {"AuditLog"}
+
+
 def tenant_owned_models():
     return [
         model
         for model in django_apps.get_models()
-        if issubclass(model, TenantOwnedModel) and not model._meta.abstract
+        if issubclass(model, TenantOwnedModel)
+        and not model._meta.abstract
+        and model.__name__ not in EXCLUDED_FROM_GENERIC_SUITE
     ]
 
 

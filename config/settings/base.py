@@ -16,6 +16,18 @@ CSRF_TRUSTED_ORIGINS = config("CSRF_TRUSTED_ORIGINS", default="", cast=Csv())
 
 STRICT_TENANCY = config("STRICT_TENANCY", default=True, cast=env_to_bool)
 
+# apps/core/audit.py connects pre_save/post_save/post_delete receivers for each of these.
+# Every entry must either be "tenancy.Organization" itself or a model with an `organization`
+# FK — apps/core/audit.py::_record() drops the row silently if it can't attribute one.
+AUDITED_MODELS = [
+    "tenancy.Organization",
+    "tenancy.Department",
+    "tenancy.Membership",
+    "catalog.Item",
+    "catalog.Category",
+    "catalog.Supplier",
+]
+
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",

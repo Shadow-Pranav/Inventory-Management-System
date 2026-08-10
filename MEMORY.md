@@ -169,6 +169,39 @@ strings colliding or need a throwaway numbering scheme Phase 5 would just replac
 blank and unconstrained; do not add ad hoc numbering here when Phase 5 starts — build the
 real generator.
 
+### D-16 · Phase 3 audit log design
+**Date:** Session 2 (2026-08-10) · **Status:** Active
+**Signals need an actor with no `request`.** `apps/core/audit.py`'s `pre_save`/`post_save`/
+`post_delete` receivers can't see `request.user` or `request.is_trust_scope` — only
+`OrganizationMiddleware` sees those. Added a second contextvar pair in `apps/core/context.py`
+(`set_current_actor(user, scope)` / `get_current_actor()` / `get_current_actor_scope()`),
+set and cleared by `OrganizationMiddleware` in the same `try/finally` as the existing
+organization contextvar. `actor_scope="TRUST"` whenever `request.user.is_trust_admin`, per
+context 02 §4's literal wording ("every trust-admin write"), not just when unpinned.
+**`Organization` is audited against itself.** It's the one model in `AUDITED_MODELS` with no
+`organization` FK of its own (it *is* the tenant) — `_record()` special-cases
+`isinstance(instance, Organization)` and uses the instance itself as the log row's org, so
+creating IMS produces an audit entry visible on IMS's own audit log, not orphaned.
+**`AuditLog` is append-only**, same rule and same reasoning as `StockMovement` (D-14):
+`save()` raises `ValidationError` if `self.pk` is already set.
+**Diffs use `field.attname`, not `field.name`** — for FKs this reads the raw `_id` value
+directly instead of triggering a fetch of the related row. Values are coerced through a
+generic `_serialize()`: JSON primitives pass through, dates/datetimes get `.isoformat()`,
+everything else (`Decimal`, `UUID`, `FieldFile`, ...) is `str()`'d. This is deliberately not
+a faithful round-trippable snapshot — it's an audit trail, not a backup.
+**Known gap, deferred:** M2M field changes (`Membership.stores`) are invisible to this
+implementation — `pre_save`/`post_save` don't fire for M2M `.add()`/`.remove()`/`.set()`,
+only `m2m_changed` does, and that signal wasn't wired up this phase. Revisit if `stores`
+reassignment ever needs to show up in an org's audit log; not blocking for Phase 3's own
+acceptance criteria, which only requires field-level diffs on regular saves.
+**`AuditLog` excluded from the generic auto-discovering isolation suite**
+(`apps/tenancy/tests/test_isolation.py`) — auditing `Organization` itself means every
+`OrganizationFactory()` call in *every other model's* isolation test now also writes an
+`AuditLog` row, which breaks that suite's implicit "factory setup for org_a/org_b is
+side-effect-free for the model under test" assumption specifically when the model under test
+is `AuditLog`. Covered directly instead in `apps/core/tests/test_audit.py` (create/update/
+delete/no-op/trust-scope/org-scoping/append-only — 9 tests).
+
 ### D-10 · Compliance registers are per-organisation
 **Why:** A hospital's biomedical-waste obligations and a hotel-management college's FSSAI
 licensing have nothing in common. A Trust-wide fixed register would be wrong for every
