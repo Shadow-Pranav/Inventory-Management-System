@@ -14,4 +14,8 @@ urlpatterns = [
     path("departments/new/", views.department_create, name="department_create"),
     path("departments/<int:pk>/edit/", views.department_update, name="department_update"),
     path("audit-log/", views.audit_log_list, name="audit_log_list"),
+    path("trust/organizations/", views.org_list, name="org_list"),
+    path("trust/organizations/new/", views.org_create, name="org_create"),
+    path("trust/organizations/<int:pk>/edit/", views.org_update, name="org_update"),
+    path("trust/users/", views.user_search, name="user_search"),
 ]

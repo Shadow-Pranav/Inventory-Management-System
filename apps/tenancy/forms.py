@@ -2,7 +2,7 @@ from django import forms
 
 from apps.core.forms import TenantModelForm
 
-from .models import Department, Membership
+from .models import Department, Membership, Organization
 
 
 class MembershipInviteForm(forms.Form):
@@ -45,3 +45,27 @@ class DepartmentForm(TenantModelForm):
     class Meta:
         model = Department
         fields = ["name", "code", "parent", "cost_centre_code"]
+
+
+class OrganizationForm(forms.ModelForm):
+    """Trust admin only. Plain `ModelForm` — `Organization` has no FK to tenant-owned data,
+    so none of `TenantModelForm`'s FK-narrowing machinery (G-09) applies here."""
+
+    class Meta:
+        model = Organization
+        fields = [
+            "name",
+            "short_name",
+            "slug",
+            "org_type",
+            "address",
+            "city",
+            "state",
+            "pincode",
+            "contact_email",
+            "contact_phone",
+            "theme_color",
+            "fiscal_year_start_month",
+            "currency",
+            "is_active",
+        ]

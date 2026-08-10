@@ -180,8 +180,17 @@ All 6 tasks complete, phase gate passed 2026-08-10.
       `on_delete` semantics) so it has no `.for_request()`/`get_tenant_object()` — scoped by
       hand in a `_membership_queryset()` helper instead, same pattern `switch_organization`
       already used. 113/113 tests green
-- [ ] Trust Admin UI: organisation CRUD, assign first Org Admin, org switcher, cross-org user
-      search
+- [x] Trust Admin UI: `org_list`/`org_create`/`org_update` (`OrganizationForm`, plain
+      `ModelForm` — `Organization` has no tenant-owned FK, so none of `TenantModelForm`'s
+      G-09 machinery applies), `user_search` (cross-org, `Q()`-filtered on email/name/
+      username, no tenant scoping needed — `User` is inherently cross-org). "Assign first
+      Org Admin" needed no new view: `org_create` pins the trust admin's session to the
+      just-created org and redirects straight into the existing `member_invite` — that view
+      already works for a trust admin with zero memberships of their own, since
+      `require_role`'s `is_trust_admin` bypass plus a pinned `request.organization` is all
+      it needs. Org switcher already existed (Phase 1). 7 new tests in
+      `test_trust_admin_views.py`, including the create→invite round trip end-to-end.
+      120/120 tests green
 - [x] `apps/core/audit.py` — `pre_save`/`post_save`/`post_delete` receivers connected from
       `CoreConfig.ready()` for every model in `settings.AUDITED_MODELS` (currently
       `Organization`, `Department`, `Membership`, `Item`, `Category`, `Supplier`).
@@ -230,9 +239,11 @@ apps/tenancy/{__init__,apps,models,admin,middleware,decorators,views,urls,forms,
 apps/tenancy/migrations/{__init__,0001_initial,0002_seed_organizations,0003_membership_stores}.py
 apps/tenancy/fixtures/organizations.json
 apps/tenancy/management/commands/{seed_demo,create_trust_admin}.py
-apps/tenancy/tests/{__init__,factories,test_isolation,test_decorators,test_permission_matrix,test_org_admin_views}.py
+apps/tenancy/tests/{__init__,factories,test_isolation,test_decorators,test_permission_matrix,
+  test_org_admin_views,test_trust_admin_views}.py
 apps/tenancy/templates/tenancy/{no_access,switch_organization,member_list,member_form,
-  member_role_form,department_list,department_form,audit_log_list}.html
+  member_role_form,department_list,department_form,audit_log_list,org_list,org_form,
+  user_search}.html
 
 apps/catalog/{__init__,apps,models,admin,forms,views,urls}.py
 apps/catalog/migrations/{__init__,0001_initial}.py
@@ -264,6 +275,7 @@ scanning the repo.
 | tenancy access control (`test_decorators.py`) | 11 | 11 | `require_org_context`, `require_role`, `require_trust_admin`, `get_tenant_object` |
 | tenancy permission matrix (`test_permission_matrix.py`) | 6 | 6 | 10 views × 4 roles + trust-admin bypass + auditor-forbidden, through real URLs |
 | tenancy org admin UI (`test_org_admin_views.py`) | 12 | 12 | invite (+ email sent, + duplicate rejection), role/dept/active update, department CRUD, audit log (org-scoped, auditor-visible, non-admin-forbidden) |
+| tenancy trust admin UI (`test_trust_admin_views.py`) | 7 | 7 | org CRUD, create→invite-first-admin round trip, cross-org user search, non-trust-admin-forbidden |
 | catalog | 28 | 28 | Isolation ×5 models (20), `TenantModelForm` regression (G-09) ×3, views ×5 |
 | inventory | 29 | 29 | Isolation ×5 models (20), `apply_movement()` ×6 (incl. concurrency), views ×3 |
 | procurement | 0 | — | Phase 5 |
@@ -271,7 +283,7 @@ scanning the repo.
 | assets | 0 | — | Phase 7 |
 | intelligence | 0 | — | Phase 8 |
 | alerts | 0 | — | Phase 9 |
-| **Total** | **113** | **113** | — |
+| **Total** | **120** | **120** | — |
 
 No baseline to carry over — greenfield build, see D-11 in `MEMORY.md`.
 

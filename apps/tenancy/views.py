@@ -1,13 +1,14 @@
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
+from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 
 from apps.core.models import AuditLog
-from apps.tenancy.decorators import get_tenant_object, require_role
+from apps.tenancy.decorators import get_tenant_object, require_role, require_trust_admin
 
 from .emails import send_password_setup_email
-from .forms import DepartmentForm, MembershipInviteForm, MembershipRoleForm
+from .forms import DepartmentForm, MembershipInviteForm, MembershipRoleForm, OrganizationForm
 from .models import Department, Membership, Organization
 
 User = get_user_model()
@@ -165,3 +166,50 @@ def audit_log_list(request):
         :200
     ]
     return render(request, "tenancy/audit_log_list.html", {"entries": entries})
+
+
+@require_trust_admin
+def org_list(request):
+    organizations = Organization.objects.order_by("name")
+    return render(request, "tenancy/org_list.html", {"organizations": organizations})
+
+
+@require_trust_admin
+def org_create(request):
+    form = OrganizationForm(request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        org = form.save()
+        # Pin the trust admin to the org they just created so the next click — inviting the
+        # first Org Admin — lands member_invite in the right organisation without a manual
+        # switch. member_invite already works for a trust admin: require_role's is_trust_admin
+        # bypass plus a pinned request.organization is all it needs.
+        request.session["active_organization_id"] = str(org.pk)
+        messages.success(request, f"Organisation '{org.name}' created. Invite its first admin.")
+        return redirect("tenancy:member_invite")
+    return render(request, "tenancy/org_form.html", {"form": form})
+
+
+@require_trust_admin
+def org_update(request, pk):
+    org = get_object_or_404(Organization, pk=pk)
+    form = OrganizationForm(request.POST or None, instance=org)
+    if request.method == "POST" and form.is_valid():
+        form.save()
+        messages.success(request, f"Organisation '{org.name}' updated.")
+        return redirect("tenancy:org_list")
+    return render(request, "tenancy/org_form.html", {"form": form, "organization": org})
+
+
+@require_trust_admin
+def user_search(request):
+    query = request.GET.get("q", "").strip()
+    results = []
+    if query:
+        users = User.objects.filter(
+            Q(email__icontains=query)
+            | Q(first_name__icontains=query)
+            | Q(last_name__icontains=query)
+            | Q(username__icontains=query)
+        ).prefetch_related("memberships__organization")[:50]
+        results = list(users)
+    return render(request, "tenancy/user_search.html", {"query": query, "results": results})

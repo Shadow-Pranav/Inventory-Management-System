@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}{% if organization %}Edit organisation{% else %}New organisation{% endif %}{% endblock %}
+{% block content %}
+<h1 class="h4 mb-3">{% if organization %}Edit {{ organization.name }}{% else %}New organisation{% endif %}</h1>
+{% if not organization %}
+<p class="text-muted">You'll be switched into this organisation afterwards to invite its first admin.</p>
+{% endif %}
+<form method="post" class="col-md-6">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit" class="btn btn-primary">Save</button>
+</form>
+{% endblock %}

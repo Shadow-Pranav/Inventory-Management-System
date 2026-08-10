@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}User search{% endblock %}
+{% block content %}
+<h1 class="h4 mb-3">Cross-organisation user search</h1>
+<form method="get" class="col-md-6 mb-3">
+    <div class="input-group">
+        <input type="text" name="q" class="form-control" value="{{ query }}"
+               placeholder="Name, email or username">
+        <button type="submit" class="btn btn-primary">Search</button>
+    </div>
+</form>
+{% if query %}
+<table class="table table-sm">
+    <thead><tr><th>Email</th><th>Name</th><th>Memberships</th></tr></thead>
+    <tbody>
+        {% for user in results %}
+        <tr>
+            <td>{{ user.email }}</td>
+            <td>{{ user.get_full_name }}</td>
+            <td>
+                {% for membership in user.memberships.all %}
+                <span class="badge text-bg-secondary">
+                    {{ membership.organization.short_name }} — {{ membership.get_role_display }}
+                </span>
+                {% empty %}
+                <span class="text-muted">No memberships</span>
+                {% endfor %}
+            </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="3" class="text-muted">No matching users.</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endif %}
+{% endblock %}
