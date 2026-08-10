@@ -1,7 +1,8 @@
 from django.contrib import messages
 from django.shortcuts import redirect, render
 
-from apps.tenancy.decorators import require_org_context
+from apps.tenancy.decorators import require_org_context, require_role
+from apps.tenancy.models import Membership
 
 from .forms import IssueRequestForm
 from .models import IssueRequest
@@ -15,7 +16,12 @@ def issue_request_list(request):
     return render(request, "issuance/issue_request_list.html", {"issue_requests": requests_qs})
 
 
-@require_org_context
+@require_role(
+    Membership.Role.ORG_ADMIN,
+    Membership.Role.STORE_MANAGER,
+    Membership.Role.DEPT_STAFF,
+    write=True,
+)
 def issue_request_create(request):
     if request.organization is None:
         return redirect("tenancy:switch_organization")

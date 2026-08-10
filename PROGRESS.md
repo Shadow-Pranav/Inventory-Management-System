@@ -152,10 +152,16 @@ All 6 tasks complete, phase gate passed 2026-08-10.
 
 ## Phase 3 — task checklist (IN PROGRESS, started 2026-08-10)
 
-- [ ] `require_role` applied to every existing view (catalog, inventory, issuance); permission
-      matrix (role × view × read/write) built as a test fixture so the matrix *is* the test
-- [ ] `AUDITOR` write-blocking: `require_role(..., write=True)` rejects auditors regardless of
-      role list
+- [x] `require_role` applied to every existing view (catalog, inventory, issuance); permission
+      matrix (role × view × read/write) built as a test fixture so the matrix *is* the test.
+      Found and fixed one real gap: `issue_request_create` only had `require_org_context`, no
+      `write=True` role check — any authenticated member (including auditors) could POST it.
+      New `apps/tenancy/tests/test_permission_matrix.py` (6 tests, drives 10 views × 4 roles
+      + trust-admin-bypass + auditor-forbidden through real URLs via the test client, not the
+      decorator in isolation) — 92/92 total tests green
+- [x] `AUDITOR` write-blocking: `require_role(..., write=True)` rejects auditors regardless of
+      role list — already true of the decorator since Phase 1 (G-07); confirmed end-to-end by
+      `test_permission_matrix_auditor_forbidden_on_every_write_view` above, not just unit-tested
 - [ ] Org Admin UI: invite/create users, assign roles, manage departments, deactivate
       memberships, view the org's audit log
 - [ ] Trust Admin UI: organisation CRUD, assign first Org Admin, org switcher, cross-org user
