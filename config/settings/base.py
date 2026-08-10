@@ -38,6 +38,7 @@ INSTALLED_APPS = [
     "django_htmx",
     "django_celery_beat",
     "django_extensions",
+    "axes",
     "apps.core",
     "apps.tenancy",
     "apps.catalog",
@@ -55,10 +56,38 @@ MIDDLEWARE = [
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "apps.tenancy.middleware.OrganizationMiddleware",
+    "apps.tenancy.middleware.ForcePasswordChangeMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "django_htmx.middleware.HtmxMiddleware",
+    "axes.middleware.AxesMiddleware",  # must be last — axes docs
 ]
+
+AUTHENTICATION_BACKENDS = [
+    "axes.backends.AxesBackend",  # must be first — locks out before ModelBackend checks
+    "django.contrib.auth.backends.ModelBackend",
+]
+
+# Login rate limiting (context 04 §8). Explicit AXES_LOCKOUT_PARAMETERS, not the library
+# default (bare "ip_address" as of axes 6.5) — SRMS institutions have shared-lab networks
+# where dozens of students sit behind one IP; locking on IP alone means one mistyped
+# password locks out the whole lab. The nested list is deliberate, not decorative: axes
+# treats a flat list (["username", "ip_address"]) as two INDEPENDENT lockout dimensions —
+# OR semantics, so an IP still gets globally locked after N failures from any accounts on
+# it. A single nested group ([["username", "ip_address"]]) tracks the *pair* as one bucket
+# instead — a lockout only follows repeated failures against one specific account from one
+# specific source; verified via the container's own "AXES: BEGIN ... blocking by" log line.
+AXES_LOCKOUT_PARAMETERS = [["username", "ip_address"]]
+AXES_FAILURE_LIMIT = 5
+AXES_COOLOFF_TIME = 1  # hour
+AXES_RESET_COOL_OFF_ON_FAILURE_DURING_LOCKOUT = False
+
+# Session expiry: idle timeout, not a fixed calendar expiry — SESSION_SAVE_EVERY_REQUEST
+# resets the clock on activity, so an active store clerk mid-shift isn't logged out, but a
+# forgotten terminal is, within the hour.
+SESSION_COOKIE_AGE = 60 * 60 * 8  # 8 hours of inactivity
+SESSION_SAVE_EVERY_REQUEST = True
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True
 
 ROOT_URLCONF = "config.urls"
 

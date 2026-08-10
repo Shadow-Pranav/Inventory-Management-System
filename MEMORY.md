@@ -233,6 +233,49 @@ below; revisit if a second view needs the same manual-scoping pattern, or if aud
 tooling written against "every tenant-owned model is a `TenantOwnedModel`" starts assuming
 it and gets it wrong for `Membership`.
 
+### D-18 · Phase 3 security hardening (django-axes, session expiry, forced password change)
+**Date:** Session 2 (2026-08-10) · **Status:** Active
+**`AXES_LOCKOUT_PARAMETERS` must be a *nested* list, not a flat one, to get combined
+tracking.** Read `axes.helpers.get_client_parameters()`'s source directly rather than
+guessing: a flat list like `["username", "ip_address"]` is iterated as two **independent**
+filter dicts — `[{"username": ...}, {"ip_address": ...}]` — which axes' own boot log
+confirms by literally printing "blocking by username **or** ip_address". That's OR
+semantics: an IP still gets globally locked after `AXES_FAILURE_LIMIT` failures against
+*any* account on it, exactly the shared-lab-network failure mode this was meant to avoid.
+The nested form, `[["username", "ip_address"]]`, produces one combined filter dict — axes'
+boot log then says "blocking by **combination of** username and ip_address", confirmed by
+`test_lockout_is_scoped_to_one_username_ip_pair_not_the_whole_ip` in
+`apps/tenancy/tests/test_security.py`. Don't trust the library default here either — it's a
+bare `["ip_address"]` as of axes 6.5, same OR-flavoured problem in miniature.
+**Axes returns 429, not 403, on lockout.** Worth stating since 403 would've been the
+intuitive guess (it's what `require_role` returns) — axes' database handler raises so the
+response is `HttpResponse(status=429)` (Too Many Requests), confirmed empirically, not from
+docs.
+**`ForcedPasswordChangeView` shadows the stock `password_change` URL by registration
+order, not by feature-flag or setting.** `config/urls.py` registers
+`path("accounts/password_change/", ForcedPasswordChangeView.as_view(),
+name="password_change")` *before* `include("django.contrib.auth.urls")`. Both patterns
+match the identical path and both are named `"password_change"` — Django's URL resolver
+tries `urlpatterns` in source order and uses the first regex match for actual request
+dispatch (reverse() name-uniqueness rules are a separate, looser mechanism and don't apply
+here since both resolve to the same path string anyway). If `django.contrib.auth.urls`'s
+include is ever moved above the explicit path, the override silently stops working with no
+error — worth a comment at both ends, and one now lives at both.
+**New `User.must_change_password`, not a session flag or a `Membership`-level field** — it's
+about the account's credential, not any one org membership or login session, and needs to
+survive across logins until actually cleared.
+**Session expiry is idle-timeout, not calendar-fixed** — `SESSION_SAVE_EVERY_REQUEST=True`
+means `SESSION_COOKIE_AGE` (8h) resets on every request, so an active user mid-shift is
+never kicked out mid-task; only a genuinely idle/forgotten session expires. No test written
+for this (see `test_security.py`'s module docstring) — simulating real elapsed time for a
+cookie-expiry assertion is low-value, and the setting itself is a plain constant.
+**New dependency needed a real image rebuild, not just `pip install` in a running
+container** — added `django-axes~=6.5` to `pyproject.toml`, regenerated `uv.lock` via
+`docker run ... uv:python3.12-bookworm-slim uv lock` (G-03's documented method — plain
+`uv:latest` has no Python), then `docker compose build web` before any of this code could
+even import `axes`. Skipping the rebuild would have been the anti-pattern CLAUDE.md §3
+rule 8 already names.
+
 ### D-10 · Compliance registers are per-organisation
 **Why:** A hospital's biomedical-waste obligations and a hotel-management college's FSSAI
 licensing have nothing in common. A Trust-wide fixed register would be wrong for every

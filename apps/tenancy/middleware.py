@@ -1,3 +1,6 @@
+from django.shortcuts import redirect
+from django.urls import Resolver404, resolve
+
 from apps.core.context import (
     clear_current_actor,
     clear_current_organization,
@@ -65,3 +68,25 @@ class OrganizationMiddleware:
             if default_membership:
                 return default_membership
         return base_qs.first()
+
+
+class ForcePasswordChangeMiddleware:
+    """Redirects any request from a `must_change_password=True` user (seed_demo accounts,
+    which share a public password) to the password-change form — everywhere except that
+    form itself and logout, so the user isn't trapped unable to leave the page."""
+
+    EXEMPT_URL_NAMES = {"password_change", "password_change_done", "logout"}
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        user = getattr(request, "user", None)
+        if user is not None and user.is_authenticated and user.must_change_password:
+            try:
+                url_name = resolve(request.path).url_name
+            except Resolver404:
+                url_name = None
+            if url_name not in self.EXEMPT_URL_NAMES:
+                return redirect("password_change")
+        return self.get_response(request)

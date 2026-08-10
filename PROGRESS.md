@@ -205,8 +205,22 @@ All 6 tasks complete, phase gate passed 2026-08-10.
       the generic isolation suite with an explained reason (auditing `Organization` itself
       breaks that suite's "factory calls are side-effect-free for other models" assumption)
       — its own isolation is asserted directly instead. 101/101 tests green
-- [ ] Password reset via email (Mailhog in dev), `django-axes` login rate limiting, session
-      expiry, forced password change on first login for seeded accounts
+- [x] Password reset via email — done as part of the Org Admin invite task above (both
+      share the same template set). `django-axes` (`~=6.5`, `pyproject.toml`/`uv.lock`
+      regenerated, image rebuilt) with **explicit** `AXES_LOCKOUT_PARAMETERS =
+      [["username", "ip_address"]]` — the library default of a flat `["ip_address"]` (or
+      even a flat `["username", "ip_address"]`, which is *not* the same thing — see
+      `MEMORY.md` D-18) would lock out an entire shared-lab IP after 5 failures against any
+      one account on it. Session expiry: `SESSION_COOKIE_AGE=8h` +
+      `SESSION_SAVE_EVERY_REQUEST=True` (idle timeout, resets on activity, not a fixed
+      calendar expiry) + `SESSION_EXPIRE_AT_BROWSER_CLOSE=True`. Forced password change:
+      new `User.must_change_password` flag, set by `seed_demo` (shared public password),
+      enforced by new `ForcePasswordChangeMiddleware` (redirects everywhere except
+      `password_change`/`password_change_done`/`logout`) and cleared by a
+      `ForcedPasswordChangeView` (shadows `django.contrib.auth.urls`'s own
+      `password_change` by being registered first in `config/urls.py` — same name, same
+      path, first match wins on dispatch). 6 new tests in `test_security.py`, including one
+      that a locked-out account doesn't take its shared IP down with it. 126/126 tests green
 - [ ] Navbar/sidebar renders only permitted links (UX only — decorator remains the actual
       security boundary)
 
@@ -227,7 +241,7 @@ config/{__init__,celery,urls,wsgi,asgi}.py
 config/settings/{__init__,base,dev,prod,test}.py
 templates/base.html, templates/partials/navbar.html
 templates/registration/login.html, password_reset_{form,done,confirm,complete,email}.html,
-  password_reset_subject.txt
+  password_reset_subject.txt, password_change_{form,done}.html
 
 apps/__init__.py
 apps/core/{__init__,apps,models,views,urls,admin,audit}.py
@@ -240,7 +254,7 @@ apps/tenancy/migrations/{__init__,0001_initial,0002_seed_organizations,0003_memb
 apps/tenancy/fixtures/organizations.json
 apps/tenancy/management/commands/{seed_demo,create_trust_admin}.py
 apps/tenancy/tests/{__init__,factories,test_isolation,test_decorators,test_permission_matrix,
-  test_org_admin_views,test_trust_admin_views}.py
+  test_org_admin_views,test_trust_admin_views,test_security}.py
 apps/tenancy/templates/tenancy/{no_access,switch_organization,member_list,member_form,
   member_role_form,department_list,department_form,audit_log_list,org_list,org_form,
   user_search}.html
@@ -276,6 +290,7 @@ scanning the repo.
 | tenancy permission matrix (`test_permission_matrix.py`) | 6 | 6 | 10 views × 4 roles + trust-admin bypass + auditor-forbidden, through real URLs |
 | tenancy org admin UI (`test_org_admin_views.py`) | 12 | 12 | invite (+ email sent, + duplicate rejection), role/dept/active update, department CRUD, audit log (org-scoped, auditor-visible, non-admin-forbidden) |
 | tenancy trust admin UI (`test_trust_admin_views.py`) | 7 | 7 | org CRUD, create→invite-first-admin round trip, cross-org user search, non-trust-admin-forbidden |
+| tenancy security (`test_security.py`) | 6 | 6 | axes lockout (+ scoped to username+IP pair, not the whole IP), forced password change redirect/clear/logout-exempt |
 | catalog | 28 | 28 | Isolation ×5 models (20), `TenantModelForm` regression (G-09) ×3, views ×5 |
 | inventory | 29 | 29 | Isolation ×5 models (20), `apply_movement()` ×6 (incl. concurrency), views ×3 |
 | procurement | 0 | — | Phase 5 |
@@ -283,7 +298,7 @@ scanning the repo.
 | assets | 0 | — | Phase 7 |
 | intelligence | 0 | — | Phase 8 |
 | alerts | 0 | — | Phase 9 |
-| **Total** | **120** | **120** | — |
+| **Total** | **126** | **126** | — |
 
 No baseline to carry over — greenfield build, see D-11 in `MEMORY.md`.
 

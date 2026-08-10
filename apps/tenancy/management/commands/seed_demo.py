@@ -52,6 +52,7 @@ class Command(BaseCommand):
         user.set_password(DEMO_PASSWORD)
         user.is_trust_admin = True
         user.is_staff = True
+        user.must_change_password = True  # shared public password — force a change on login
         user.save()
         return (email, "TRUST_ADMIN", "—")
 
@@ -69,6 +70,7 @@ class Command(BaseCommand):
             username = f"{org.slug}-{role.lower()}"
             user, _ = User.objects.get_or_create(email=email, defaults={"username": username})
             user.set_password(DEMO_PASSWORD)
+            user.must_change_password = True  # shared public password — force a change on login
             user.save()
 
             department = departments[0] if role == Membership.Role.DEPT_STAFF else None

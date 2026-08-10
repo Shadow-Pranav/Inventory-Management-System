@@ -412,6 +412,19 @@ wheels = [
 ]
 
 [[package]]
+name = "django-axes"
+version = "6.5.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "asgiref" },
+    { name = "django" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/8e/cc/383f9c247f65e5e2e90df4a2be0c982053684364349b51c1d1509d6e7a75/django_axes-6.5.2.tar.gz", hash = "sha256:c2c007d61a3de018ef97649350dc15e5663cd9def1a05de8eeb0fe6adc1ed2ab", size = 246681, upload-time = "2024-09-21T10:11:07.68Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/da/89/340932f7ef3adeab4aa4a1824a7f094bd24be86025c62bd26c0183e0ff0c/django_axes-6.5.2-py3-none-any.whl", hash = "sha256:fab92b98032fff55d7d2e0fdfade2be189949b6590b9e0c90e6fd213dd70bb67", size = 68447, upload-time = "2024-09-21T10:10:49.695Z" },
+]
+
+[[package]]
 name = "django-celery-beat"
 version = "2.9.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1044,6 +1057,7 @@ source = { virtual = "." }
 dependencies = [
     { name = "celery" },
     { name = "django" },
+    { name = "django-axes" },
     { name = "django-celery-beat" },
     { name = "django-extensions" },
     { name = "django-htmx" },
@@ -1072,6 +1086,7 @@ dev = [
 requires-dist = [
     { name = "celery", specifier = "~=5.4" },
     { name = "django", specifier = "~=5.0" },
+    { name = "django-axes", specifier = "~=6.5" },
     { name = "django-celery-beat", specifier = "~=2.7" },
     { name = "django-extensions", specifier = "~=3.2" },
     { name = "django-htmx", specifier = "~=1.19" },

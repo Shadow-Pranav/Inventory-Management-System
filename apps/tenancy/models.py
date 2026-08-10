@@ -67,6 +67,11 @@ class User(AbstractUser):
     phone = models.CharField(max_length=20, blank=True)
     employee_code = models.CharField(max_length=30, blank=True)
     is_trust_admin = models.BooleanField(default=False)
+    must_change_password = models.BooleanField(
+        default=False,
+        help_text="Forces a redirect to the password-change form on next login. Set for "
+        "seed_demo accounts (shared public password); cleared automatically on change.",
+    )
     default_organization = models.ForeignKey(
         Organization, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
     )

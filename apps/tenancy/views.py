@@ -1,6 +1,7 @@
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.views import PasswordChangeView
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 
@@ -16,6 +17,20 @@ User = get_user_model()
 
 def no_access(request):
     return render(request, "tenancy/no_access.html")
+
+
+class ForcedPasswordChangeView(PasswordChangeView):
+    """Same form as Django's built-in password-change — clears `must_change_password` on
+    success so `ForcePasswordChangeMiddleware` stops redirecting here. Registered under the
+    same URL name ('password_change') ahead of `django.contrib.auth.urls`'s own pattern in
+    config/urls.py, so it wins on dispatch without the self-service flow knowing anything
+    changed."""
+
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        self.request.user.must_change_password = False
+        self.request.user.save(update_fields=["must_change_password"])
+        return response
 
 
 @login_required
