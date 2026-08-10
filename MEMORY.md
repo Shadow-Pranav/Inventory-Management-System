@@ -276,6 +276,22 @@ container** — added `django-axes~=6.5` to `pyproject.toml`, regenerated `uv.lo
 even import `axes`. Skipping the rebuild would have been the anti-pattern CLAUDE.md §3
 rule 8 already names.
 
+### D-19 · Phase 3 gate closed on a genuine cold start
+**Date:** Session 2 (2026-08-10) · **Status:** Active
+**Decision:** Phase 3 gated `DONE` after all 7 tasks (permission matrix, `AuditLog`, Org
+Admin UI, Trust Admin UI, `django-axes`/session-expiry/forced-password-change, navbar) were
+built, tested (44 new tests, 86→130), and the full `CLAUDE.md` §7 DoD walked against a fresh
+volume — the user ran `docker compose down -v && docker compose up --build -d` (G-05: still
+hard-denied for Claude), confirmed success, and the identical migrations/tests/isolation/
+ruff/seed_demo checks were re-run against that fresh volume with the same result as the live
+stack. Same pattern as D-15 (Phase 2's close) — repeating the note because a phase's own
+"done" claim should always mean both a live-stack pass and a from-scratch pass, not just one.
+**Why recorded:** two real bugs were caught and fixed *during* this phase, both worth
+remembering as examples of what "walk the DoD" actually catches: `issue_request_create`
+missing `write=True` (an auditor could POST it) found by the new permission-matrix test
+before it shipped, and the `AXES_LOCKOUT_PARAMETERS` flat-vs-nested-list bug (see D-18)
+found by reading the library's own source rather than trusting a first guess.
+
 ### D-10 · Compliance registers are per-organisation
 **Why:** A hospital's biomedical-waste obligations and a hotel-management college's FSSAI
 licensing have nothing in common. A Trust-wide fixed register would be wrong for every

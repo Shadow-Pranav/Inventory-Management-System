@@ -242,6 +242,18 @@ Supported by the schema from day one; the UI ships in Phase 3.
 `TenantOwnedModel`, discovered via `apps.get_models()`. Adding a new tenant model
 automatically adds it to the suite; there is nothing to remember.
 
+**Two deliberate exceptions**, both from Phase 3 — don't read either as a gap:
+- `AuditLog` inherits `TenantOwnedModel` but is excluded from this generic suite by name.
+  It audits `Organization` itself (see §7 below), so every `OrganizationFactory()` call any
+  *other* model's test makes also writes an `AuditLog` row — breaking this suite's "factory
+  setup is side-effect-free for the model under test" assumption specifically when the model
+  under test is `AuditLog`. Covered directly in `apps/core/tests/test_audit.py` instead.
+  See MEMORY.md D-16.
+- `Membership` is **not** a `TenantOwnedModel` at all (predates it; `on_delete=CASCADE`, not
+  `TenantOwnedModel`'s `PROTECT`) — no `.for_request()`, no `get_tenant_object()`, not in
+  this suite. Scoped by hand where needed (`apps/tenancy/views.py::_membership_queryset()`).
+  See MEMORY.md D-17, X-09.
+
 For each model, assert:
 1. Org A's user gets `count() == 0` when only Org B rows exist
 2. Org A's user gets 404, not 403, on Org B's object detail URL (403 confirms existence)
@@ -259,7 +271,31 @@ in the session).
 
 ---
 
-## 7. Review checklist before any tenancy-touching commit
+## 7. Audit trail
+
+`apps/core/audit.py` (Phase 3) connects `pre_save`/`post_save`/`post_delete` receivers, from
+`CoreConfig.ready()`, for every model listed in `settings.AUDITED_MODELS` — currently
+`Organization`, `Department`, `Membership`, `Item`, `Category`, `Supplier`. Writes an
+append-only `AuditLog` row (same "raises on update" rule as `StockMovement`) with a
+field-level diff: `{field: [old, new]}` for CREATE/UPDATE, last-known state for DELETE.
+
+Signals have no `request`, so a second contextvar pair alongside `get_current_organization`
+carries the actor: `apps/core/context.py::get_current_actor()` /
+`get_current_actor_scope()`, set by `OrganizationMiddleware` in the same `try/finally` as the
+organization one. `actor_scope="TRUST"` whenever `request.user.is_trust_admin` — matches §4's
+rule literally ("every trust-admin write"), not just unpinned ones.
+
+`Organization` has no `organization` FK of its own (it *is* the tenant) — `_record()`
+special-cases it, attributing the log row to the org itself. Every other `AUDITED_MODELS`
+entry must have a real `organization` FK or the row is silently dropped.
+
+**Known gap:** M2M changes (`Membership.stores`) aren't captured — `pre_save`/`post_save`
+don't fire for `.add()`/`.remove()`/`.set()`, only `m2m_changed` does, and that isn't wired
+up. Deferred; see MEMORY.md D-16.
+
+---
+
+## 8. Review checklist before any tenancy-touching commit
 
 - [ ] Every new model with tenant data inherits `TenantOwnedModel`
 - [ ] Every unique constraint includes `organization`

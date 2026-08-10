@@ -187,7 +187,10 @@ apps/<app>/tests/
 - File uploads: validate extension **and** content type, cap size, store outside the
   webroot, serve through a permission-checking view — never a direct `MEDIA_URL` link for
   compliance certificates or invoices.
-- Rate-limit login (`django-axes` or equivalent).
+- Rate-limit login — **done, Phase 3**: `django-axes`, with `AXES_LOCKOUT_PARAMETERS =
+  [["username", "ip_address"]]` (a nested list, deliberately — a flat list gives independent
+  OR-tracking per field and would lock a whole shared-lab IP out after failures against any
+  one account on it; see MEMORY.md D-18).
 - Never log a password, token, or full session key.
 - Prod: `SECURE_SSL_REDIRECT`, `SESSION_COOKIE_SECURE`, `CSRF_COOKIE_SECURE`, HSTS,
   `X_FRAME_OPTIONS=DENY`.

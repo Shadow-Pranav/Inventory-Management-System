@@ -9,12 +9,12 @@
 
 | | |
 |---|---|
-| **Last session** | Session 2 (2026-08-10) — Phase 2 gated closed (cold-start + full gate green, user-run down -v); Phase 3 opened |
-| **Current phase** | Phase 3 — Access control & org administration |
+| **Last session** | Session 2 (2026-08-10) — Phase 3 built end-to-end (all 7 tasks) and gated closed (cold-start + full gate green, user-run down -v); Phase 4 opened |
+| **Current phase** | Phase 4 — Master data & catalogue |
 | **Phase status** | `IN PROGRESS` — checklist expanded, no code yet |
-| **Next action** | Start Task 1: `require_role` applied to every existing view + permission-matrix test fixture |
+| **Next action** | Start Task 1: category tree UI (nested list, breadcrumb, cycle prevention on save) |
 | **Blockers** | None. Q4–Q8 still open, needed before Phase 5. |
-| **Branch** | `main` — 9 commits (`824a109` … `88f29cc` Phase 2 gate close); tree clean, 86/86 tests passing |
+| **Branch** | `main` — 21 commits (`824a109` … Phase 3 gate close); tree clean, 130/130 tests passing |
 
 ---
 
@@ -25,8 +25,8 @@
 | 0 | Bootstrap the project | `DONE` | 2026-08-09 | 2026-08-09 | Greenfield (D-11); cold-start verified |
 | 1 | Tenancy foundation | `DONE` | 2026-08-09 | 2026-08-09 | Gate passed cold-start, 19/19 tests, DoD walked |
 | 2 | Catalogue & inventory models | `DONE` | 2026-08-09 | 2026-08-10 | Gate passed cold-start (user-run), 86/86 tests, isolation 55/55, ruff clean |
-| 3 | Access control & org admin | `IN PROGRESS` | 2026-08-10 | — | Stale note removed: `Item.quantity` never existed (D-05/D-11, greenfield) — nothing to drop |
-| 4 | Master data & catalogue | `NOT STARTED` | — | — | |
+| 3 | Access control & org admin | `DONE` | 2026-08-10 | 2026-08-10 | Gate passed cold-start (user-run), 130/130 tests, isolation 55/55, ruff clean |
+| 4 | Master data & catalogue | `IN PROGRESS` | 2026-08-10 | — | |
 | 5 | Procurement (Req→PO→GRN) | `NOT STARTED` | — | — | |
 | 6 | Issuance, returns, transfers | `NOT STARTED` | — | — | |
 | 7 | Assets & compliance | `NOT STARTED` | — | — | |
@@ -36,7 +36,7 @@
 | 11 | API & integrations | `NOT STARTED` | — | — | Optional for v1 |
 | 12 | Hardening & deployment | `NOT STARTED` | — | — | |
 
-**Overall: 3 / 13 phases complete.**
+**Overall: 4 / 13 phases complete.**
 
 ---
 
@@ -150,7 +150,9 @@ All 6 tasks complete, phase gate passed 2026-08-10.
 
 </details>
 
-## Phase 3 — task checklist (IN PROGRESS, started 2026-08-10)
+## Phase 3 — task checklist (DONE, 2026-08-10)
+
+<details><summary>All 7 tasks complete, gate passed — expand for the record</summary>
 
 - [x] `require_role` applied to every existing view (catalog, inventory, issuance); permission
       matrix (role × view × read/write) built as a test fixture so the matrix *is* the test.
@@ -234,7 +236,37 @@ All 6 tasks complete, phase gate passed 2026-08-10.
 **Acceptance:** permission matrix test passes for all 5 roles × all views; Org Admin of
 Nursing gets 404 (not 403) on a CET item URL; auditor gets 403 on every POST/PUT/DELETE;
 audit log records who changed what, from what, to what; a trust admin editing IMS data
-produces a row visible to the IMS Org Admin.
+produces a row visible to the IMS Org Admin. All met.
+- [x] Phase gate: cold-start (`down -v && up --build`, user-run — G-05), `makemigrations
+      --check` (no changes), `pytest` (130/130), `pytest -k isolation` (55/55), `ruff
+      check`/`format --check` clean, `seed_demo` clean — all re-run against the fresh
+      volume. CLAUDE.md §7 DoD walked item by item, no gaps. Context 02 updated with a new
+      §7 "Audit trail" section and a note on the two deliberate exceptions to the generic
+      isolation suite (`AuditLog`, `Membership`); context 04's security-baseline line for
+      login rate limiting marked done with the `AXES_LOCKOUT_PARAMETERS` gotcha noted.
+
+</details>
+
+## Phase 4 — task checklist (IN PROGRESS, started 2026-08-10)
+
+- [ ] Category tree UI (nested list, drag-free — parent select is fine), breadcrumb display,
+      cycle prevention on save
+- [ ] Full `Supplier` CRUD: GSTIN validation (regex + checksum), rating, blacklisting with a
+      reason, contact history. Blacklisted suppliers cannot be selected on a new PO
+- [ ] `ItemSupplier` price list with validity windows; surface "preferred supplier + last
+      price" on the item detail page
+- [ ] `UnitOfMeasure` per org with sensible defaults seeded (piece, box, kg, litre, pack, set)
+- [ ] Item detail page: current stock across locations, movement history (paginated), price
+      history, suppliers, open POs, analytics placeholder
+- [ ] Bulk CSV/XLSX import for items, suppliers and opening stock: preview → validate →
+      row-level error report → commit atomically. Import must respect tenancy — the org
+      comes from `request`, never from a column in the file
+- [ ] Barcode/QR generation per item and per serial unit; printable label sheets (WeasyPrint)
+- [ ] Location hierarchy management with a tree view
+
+**Acceptance:** importing 500 items with 3 bad rows commits nothing and reports exactly
+those 3 rows; category cycles rejected with a clear message; labels print correctly at
+38×25mm; item search covers name, SKU, barcode and is org-scoped.
 
 ---
 
@@ -356,6 +388,24 @@ Newest first. Keep entries to three lines. Detail belongs in `MEMORY.md`.
   existed per D-05/D-11 (greenfield); nothing to drop.
 - Phase 3 (access control & org admin) opened, checklist expanded from `PROMPTS.md`. No
   blockers; Q4–Q8 still open but don't block this phase.
+- Built all 7 Phase 3 tasks in commits `ac00751`…`91068aa`: permission matrix + fixed a real
+  gap (`issue_request_create` missing `write=True`), `AuditLog` with field-level diffs and a
+  new actor contextvar, Org Admin UI (invite/roles/departments/audit log), Trust Admin UI
+  (org CRUD + cross-org user search, "assign first admin" reused `member_invite` via session
+  pinning), `django-axes` + session expiry + forced password change, and a navbar that had
+  **zero** feature links before this session (only org switcher + logout).
+- Found and fixed a real axes misconfiguration before it shipped: a flat
+  `AXES_LOCKOUT_PARAMETERS` list gives OR/independent-dimension tracking, not the combined
+  `(username, ip_address)` pairing the comment first claimed — would have locked a whole
+  shared-lab IP out after failures against any one account. Caught by reading axes' own
+  source and its boot log, fixed with the nested-list form, and tested
+  (`test_lockout_is_scoped_to_one_username_ip_pair_not_the_whole_ip`). See D-18.
+- Flagged, not fixed: `Membership` isn't a `TenantOwnedModel` (predates it) — scoped by hand
+  in a new `_membership_queryset()` helper instead of a mid-phase base-class change. X-09.
+- 44 new tests this session (86→130), all green. `/next-phase`: user ran the cold-start
+  check manually (G-05); full gate green on the fresh volume. CLAUDE.md §7 DoD walked,
+  context 02/04 updated. **Phase 3 closed.**
+- Phase 4 (master data & catalogue) opened, checklist expanded. No blockers.
 
 ### 2026-08-09 — Session 1
 - Found no original-repo clone in the directory (planning bundle only, not a git repo) —
